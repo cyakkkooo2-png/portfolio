@@ -1,0 +1,16 @@
+name: Keep Alive
+
+# Ping the site every 5 minutes to prevent Railway free tier from sleeping
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # every 5 minutes
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping site
+        run: |
+          curl -sf https://portfolio-production-913f.up.railway.app/api/health \
+            && echo "✅ Site is awake" \
+            || echo "⚠️ Ping failed"
