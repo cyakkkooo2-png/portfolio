@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: my-portfolio
+    env: node
+    region: oregon
+    plan: free
+    branch: master
+    buildCommand: npm run build
+    startCommand: npm start
+    autoDeploy: true
