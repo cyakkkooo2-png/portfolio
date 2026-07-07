@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+Thumbs.db
+ngrok*
+tunnel_url.txt
+
+# User data (auto-created by server on first run)
+server/data/
+
+# User uploads (stored on cloud disk, not in git)
+server/uploads/
