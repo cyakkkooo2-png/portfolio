@@ -12,3 +12,5 @@ server/data/
 
 # User uploads (stored on cloud disk, not in git)
 server/uploads/
+cloudflared.exe
+cf_output.txt
