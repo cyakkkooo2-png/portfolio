@@ -1,5 +1,5 @@
 node_modules/
-dist/
+# dist/  — included in Railway deploy
 .env
 *.log
 .DS_Store
