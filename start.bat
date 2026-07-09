@@ -1,11 +1,11 @@
 @echo off
 chcp 65001 >nul 2>&1
-title 🎨 作品集网站
+title 🎨 我的空间
 setlocal enabledelayedexpansion
 
 echo.
 echo   ╔══════════════════════════════════════════════╗
-echo   ║          🎨 我的作品集网站                      ║
+echo   ║          🎨 我的空间                            ║
 echo   ╚══════════════════════════════════════════════╝
 echo.
 

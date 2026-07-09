@@ -1,15 +1,20 @@
 /**
- * GitHub Storage — stores uploaded files in the GitHub repo
- * Files are accessible via raw.githubusercontent.com (permanent, free)
+ * GitHub Storage — two strategies:
+ *   Small files (<80MB): GitHub Content API (simple, inline in repo)
+ *   Large files (videos): GitHub Releases API (streaming, up to 2GB)
  */
+
 const https = require('https');
 const path = require('path');
+const fs = require('fs');
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 const REPO_OWNER = 'cyakkkooo2-png';
 const REPO_NAME = 'portfolio';
 const STORAGE_BRANCH = 'master';
-const STORAGE_PATH = 'storage'; // files stored in repo's storage/ folder
+const STORAGE_PATH = 'storage';
+const MAX_CONTENT_SIZE = 80 * 1024 * 1024; // 80MB - use Content API
+const RELEASE_TAG = 'video-uploads';        // tag for the video release
 
 function githubRequest(method, apiPath, body) {
   return new Promise((resolve, reject) => {
@@ -24,8 +29,8 @@ function githubRequest(method, apiPath, body) {
       },
     };
 
-    if (body) {
-      const bodyStr = JSON.stringify(body);
+    const bodyStr = body ? JSON.stringify(body) : null;
+    if (bodyStr) {
       options.headers['Content-Type'] = 'application/json';
       options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
     }
@@ -34,52 +39,37 @@ function githubRequest(method, apiPath, body) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          try {
-            resolve(JSON.parse(data));
-          } catch {
-            resolve(data);
+        try {
+          const json = JSON.parse(data);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(json);
+          } else {
+            reject(new Error(json.message || `HTTP ${res.statusCode}`));
           }
-        } else {
-          let errMsg = `GitHub API ${res.statusCode}`;
-          try {
-            const err = JSON.parse(data);
-            errMsg = err.message || errMsg;
-          } catch {}
-          reject(new Error(errMsg));
+        } catch {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(data);
+          } else {
+            reject(new Error(`HTTP ${res.statusCode}: ${data.substring(0, 200)}`));
+          }
         }
       });
     });
 
     req.on('error', reject);
-
-    if (body) {
-      const bodyStr = JSON.stringify(body);
-      req.write(bodyStr);
-    }
+    if (bodyStr) req.write(bodyStr);
     req.end();
   });
 }
 
-/**
- * Upload a file to the GitHub repo storage/ folder
- * @param {string} filePath - local file path
- * @param {string} folder - subfolder (images/videos/articles)
- * @returns {Promise<string>} - raw.githubusercontent.com URL
- */
-async function uploadFile(filePath, folder) {
-  const fs = require('fs');
-
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`文件不存在: ${filePath}`);
-  }
-
+// ---- Small files: Content API ----
+async function uploadSmallFile(filePath, folder) {
   const fileBuffer = fs.readFileSync(filePath);
   const base64Content = fileBuffer.toString('base64');
   const fileName = path.basename(filePath);
   const githubFilePath = `${STORAGE_PATH}/${folder}/${fileName}`;
 
-  // Check if file already exists (to get sha for update)
+  // Check if file already exists
   let sha = null;
   try {
     const existing = await githubRequest(
@@ -87,60 +77,137 @@ async function uploadFile(filePath, folder) {
       `/repos/${REPO_OWNER}/${REPO_NAME}/contents/${githubFilePath}?ref=${STORAGE_BRANCH}`
     );
     sha = existing.sha;
-  } catch {
-    // File doesn't exist yet, that's fine
-  }
-
-  const body = {
-    message: `Upload: ${folder}/${fileName}`,
-    content: base64Content,
-    branch: STORAGE_BRANCH,
-  };
-  if (sha) body.sha = sha;
+  } catch {}
 
   await githubRequest(
     'PUT',
     `/repos/${REPO_OWNER}/${REPO_NAME}/contents/${githubFilePath}`,
-    body
+    {
+      message: `Upload: ${folder}/${fileName}`,
+      content: base64Content,
+      branch: STORAGE_BRANCH,
+      ...(sha ? { sha } : {}),
+    }
   );
 
-  // Return the raw URL
   return `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${STORAGE_BRANCH}/${githubFilePath}`;
 }
 
-/**
- * Delete a file from GitHub storage
- * @param {string} rawUrl - the raw.githubusercontent.com URL
- */
-async function deleteFile(rawUrl) {
-  if (!rawUrl || !rawUrl.includes('raw.githubusercontent.com')) {
-    return; // Not a GitHub storage URL, skip
+// ---- Large files: Releases API (streaming, no memory pressure) ----
+async function getOrCreateRelease() {
+  // Find existing release by tag
+  try {
+    const releases = await githubRequest(
+      'GET',
+      `/repos/${REPO_OWNER}/${REPO_NAME}/releases`
+    );
+    const existing = releases.find(r => r.tag_name === RELEASE_TAG);
+    if (existing) return existing;
+  } catch {}
+
+  // Create the release
+  const release = await githubRequest(
+    'POST',
+    `/repos/${REPO_OWNER}/${REPO_NAME}/releases`,
+    {
+      tag_name: RELEASE_TAG,
+      name: 'Video Uploads',
+      body: 'Permanent storage for uploaded videos.',
+      draft: false,
+      prerelease: false,
+    }
+  );
+  return release;
+}
+
+async function uploadLargeFile(filePath, folder) {
+  const fileName = path.basename(filePath);
+  const release = await getOrCreateRelease();
+
+  // Upload asset via uploads.github.com (streaming, accepts raw binary)
+  const uploadUrl = release.upload_url.replace('{?name,label}', `?name=${encodeURIComponent(`${folder}-${fileName}`)}`);
+  const hostname = 'uploads.github.com';
+  const urlPath = uploadUrl.replace('https://uploads.github.com', '');
+
+  return new Promise((resolve, reject) => {
+    const stat = fs.statSync(filePath);
+    const fileStream = fs.createReadStream(filePath);
+
+    const req = https.request({
+      hostname,
+      path: urlPath,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+        'User-Agent': 'portfolio-app',
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': stat.size,
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (res.statusCode === 201 || res.statusCode === 200) {
+            console.log(`Video uploaded to GitHub Releases: ${json.name}`);
+            // The asset has a permanent browser_download_url
+            resolve(json.browser_download_url);
+          } else {
+            reject(new Error(`Release upload failed: ${json.message || res.statusCode}`));
+          }
+        } catch {
+          reject(new Error(`Upload failed: HTTP ${res.statusCode}`));
+        }
+      });
+    });
+
+    req.on('error', reject);
+    fileStream.pipe(req);
+  });
+}
+
+// ---- Public API ----
+
+async function uploadFile(filePath, folder) {
+  const stat = fs.statSync(filePath);
+
+  if (stat.size <= MAX_CONTENT_SIZE) {
+    return {
+      url: await uploadSmallFile(filePath, folder),
+      local: false,
+    };
   }
 
-  // Extract path from URL
-  // https://raw.githubusercontent.com/cyakkkooo2-png/portfolio/master/storage/images/file.jpg
+  // Large file: use Releases API with streaming
+  console.log(`Large file (${(stat.size / 1024 / 1024).toFixed(1)} MB) → GitHub Releases API`);
+  return {
+    url: await uploadLargeFile(filePath, folder),
+    local: false,
+  };
+}
+
+async function deleteFile(rawUrl) {
+  if (!rawUrl || !rawUrl.includes('raw.githubusercontent.com')) return;
+
   const urlParts = rawUrl.split('raw.githubusercontent.com/');
   if (urlParts.length < 2) return;
 
-  const pathAfterRepo = urlParts[1].split('/').slice(2).join('/'); // remove owner/repo
+  const pathAfterRepo = urlParts[1].split('/').slice(2).join('/');
 
   try {
-    const existing = await githubRequest(
+    const resp = await githubRequest(
       'GET',
       `/repos/${REPO_OWNER}/${REPO_NAME}/contents/${pathAfterRepo}?ref=${STORAGE_BRANCH}`
     );
-
     await githubRequest(
       'DELETE',
       `/repos/${REPO_OWNER}/${REPO_NAME}/contents/${pathAfterRepo}`,
-      {
-        message: `Delete: ${path.basename(pathAfterRepo)}`,
-        sha: existing.sha,
-        branch: STORAGE_BRANCH,
-      }
+      { message: `Delete: ${path.basename(pathAfterRepo)}`, sha: resp.sha, branch: STORAGE_BRANCH }
     );
   } catch (err) {
-    console.error('Failed to delete GitHub file:', err.message);
+    console.error('Delete failed:', err.message);
   }
 }
 

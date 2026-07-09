@@ -12,10 +12,10 @@ if (!fs.existsSync(DATA_DIR)) {
 
 // Initialize files if they don't exist
 if (!fs.existsSync(WORKS_FILE)) {
-  fs.writeFileSync(WORKS_FILE, JSON.stringify([]));
+  fs.writeFileSync(WORKS_FILE, JSON.stringify([]), { encoding: 'utf8' });
 }
 if (!fs.existsSync(USERS_FILE)) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify([]));
+  fs.writeFileSync(USERS_FILE, JSON.stringify([]), { encoding: 'utf8' });
 }
 
 // --- Works ---
@@ -41,13 +41,14 @@ function createWork(data) {
     description: data.description || '',
     type: data.type,
     file_path: data.file_path || '',
+    file_size: data.file_size || null, // bytes
     content: data.content || '',
     thumbnail: data.thumbnail || '',
     tags: data.tags || [],
     created_at: new Date().toISOString(),
   };
   works.push(work);
-  fs.writeFileSync(WORKS_FILE, JSON.stringify(works, null, 2));
+  fs.writeFileSync(WORKS_FILE, JSON.stringify(works, null, 2), { encoding: 'utf8' });
   return work;
 }
 
@@ -56,7 +57,7 @@ function updateWork(id, data) {
   const index = works.findIndex(w => w.id === id);
   if (index === -1) return null;
   works[index] = { ...works[index], ...data, id }; // preserve id
-  fs.writeFileSync(WORKS_FILE, JSON.stringify(works, null, 2));
+  fs.writeFileSync(WORKS_FILE, JSON.stringify(works, null, 2), { encoding: 'utf8' });
   return works[index];
 }
 
@@ -65,7 +66,7 @@ function deleteWork(id) {
   const index = works.findIndex(w => w.id === id);
   if (index === -1) return false;
   works.splice(index, 1);
-  fs.writeFileSync(WORKS_FILE, JSON.stringify(works, null, 2));
+  fs.writeFileSync(WORKS_FILE, JSON.stringify(works, null, 2), { encoding: 'utf8' });
   return true;
 }
 
@@ -89,7 +90,7 @@ function createUser(data) {
     password: data.password,
   };
   users.push(user);
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), { encoding: 'utf8' });
   return user;
 }
 

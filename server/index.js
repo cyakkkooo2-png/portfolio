@@ -6,14 +6,17 @@ const db = require('./db/database');
 
 const authRoutes = require('./routes/auth');
 const worksRoutes = require('./routes/works');
+const statsRoutes = require('./routes/stats');
+const contactRoutes = require('./routes/contact');
+const themeRoutes = require('./routes/theme');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
+// Middleware — increase limits for video uploads
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -21,6 +24,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/works', worksRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/contact', contactRoutes);
+app.use('/api/theme', themeRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
