@@ -9,7 +9,7 @@ async function request(url, options = {}) {
   const headers = { ...options.headers };
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
   }
 
   if (!(options.body instanceof FormData)) {
@@ -30,7 +30,6 @@ async function request(url, options = {}) {
   return data;
 }
 
-// Auth
 export function login(username, password) {
   return request('/auth/login', {
     method: 'POST',
@@ -42,7 +41,6 @@ export function checkAuth() {
   return request('/auth/me');
 }
 
-// Works
 export function getWorks(type) {
   const query = type ? `?type=${type}` : '';
   return request(`/works${query}`);
@@ -52,7 +50,6 @@ export function getWork(id) {
   return request(`/works/${id}`);
 }
 
-// Storage stats
 export function getStats() {
   return request('/stats');
 }
@@ -63,15 +60,10 @@ export function deleteWork(id) {
   });
 }
 
-/**
- * Upload with progress tracking via XHR
- */
 export function uploadWorkWithProgress(formData, { onProgress, method = 'POST', workId = null } = {}) {
   return new Promise((resolve, reject) => {
     const token = getToken();
-    // Upload directly to Railway to avoid Cloudflare body size limits
-    const base = 'https://portfolio-production-913f.up.railway.app';
-    const url = workId ? `${base}/api/works/${workId}` : `${base}/api/works`;
+    const url = workId ? `${API_BASE}/works/${workId}` : `${API_BASE}/works`;
 
     const xhr = new XMLHttpRequest();
     xhr.open(method, url);
@@ -80,66 +72,58 @@ export function uploadWorkWithProgress(formData, { onProgress, method = 'POST', 
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     }
 
-    // Track upload progress
     let lastTime = Date.now();
     let lastLoaded = 0;
 
-    xhr.upload.addEventListener('progress', (e) => {
-      if (!e.lengthComputable || e.total === 0) return;
+    xhr.upload.addEventListener('progress', (event) => {
+      if (!event.lengthComputable || event.total === 0) return;
 
       const now = Date.now();
-      const timeDiff = (now - lastTime) / 1000;
-      const bytesDiff = e.loaded - lastLoaded;
-      lastLoaded = e.loaded;
+      const seconds = (now - lastTime) / 1000;
+      const bytesDiff = event.loaded - lastLoaded;
+      lastLoaded = event.loaded;
       lastTime = now;
 
-      // Calculate speed
-      const bps = timeDiff > 0 ? bytesDiff / timeDiff : 0;
-      let speedStr = '';
-      if (bps > 1024 * 1024) {
-        speedStr = (bps / (1024 * 1024)).toFixed(1) + ' MB/s';
-      } else if (bps > 1024) {
-        speedStr = Math.round(bps / 1024) + ' KB/s';
-      } else {
-        speedStr = Math.round(bps) + ' B/s';
-      }
+      const bps = seconds > 0 ? bytesDiff / seconds : 0;
+      const speed = bps > 1024 * 1024
+        ? `${(bps / (1024 * 1024)).toFixed(1)} MB/s`
+        : bps > 1024
+          ? `${Math.round(bps / 1024)} KB/s`
+          : `${Math.round(bps)} B/s`;
 
-      const totalMB = (e.total / (1024 * 1024)).toFixed(1);
-      const loadedMB = ((e.loaded / e.total * parseFloat(totalMB))).toFixed(1);
+      const totalMB = (event.total / (1024 * 1024)).toFixed(1);
+      const loadedMB = (event.loaded / (1024 * 1024)).toFixed(1);
 
       onProgress?.({
-        percent: Math.round((e.loaded / e.total) * 100),
-        loaded: e.loaded,
-        total: e.total,
-        speed: `${speedStr} · ${loadedMB} / ${totalMB} MB`,
+        percent: Math.round((event.loaded / event.total) * 100),
+        loaded: event.loaded,
+        total: event.total,
+        speed: `${speed} · ${loadedMB} / ${totalMB} MB`,
       });
     });
 
     xhr.addEventListener('load', () => {
+      let data = {};
       try {
-        const data = JSON.parse(xhr.responseText || '{}');
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(data);
-        } else {
-          reject(new Error(data.error || `上传失败 (${xhr.status})`));
-        }
+        data = JSON.parse(xhr.responseText || '{}');
       } catch {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve({});
-        } else {
-          reject(new Error(`上传失败 (${xhr.status})`));
-        }
+        data = {};
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        reject(new Error(data.error || `上传失败 (${xhr.status})`));
       }
     });
 
-    xhr.addEventListener('error', () => reject(new Error('网络错误，上传失败')));
+    xhr.addEventListener('error', () => reject(new Error('网络错误，上传失败。请检查文件大小或稍后重试。')));
     xhr.addEventListener('abort', () => reject(new Error('上传已取消')));
 
     xhr.send(formData);
   });
 }
 
-// Simple wrappers (no progress tracking)
 export function createWork(formData) {
   return uploadWorkWithProgress(formData, { method: 'POST' });
 }

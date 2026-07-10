@@ -60,7 +60,7 @@ export default function Navbar() {
         <div className="hidden items-center gap-7 md:flex">
           {home && navs.map((n) => (
             <a key={n.id} href={`#${n.id}`} onClick={(e) => { e.preventDefault(); to(n.id); }} className="text-sm font-semibold no-underline transition-opacity hover:opacity-70" style={{ color: activeSection === n.id ? fg : muted }}>
-              <RichText value={t?.[n.key]} fallback={n.fallback} />
+              <RichText value={t?.[n.key]} fallback={n.fallback} forceColor={activeSection === n.id ? fg : muted} />
             </a>
           ))}
           {user ? (
