@@ -1,9 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 const labels = { video: '🎬 视频', image: '🖼️ 图片', article: '📝 文章' };
 function au(u) { if (!u) return ''; if (u.startsWith('/uploads/')) return 'https://portfolio-production-913f.up.railway.app' + u; return u; }
+function videoSrc(u) { if (!u) return ''; if (u.startsWith('/uploads/')) return 'https://portfolio-production-913f.up.railway.app' + u; if (/^https?:\/\//i.test(u)) return `/api/works/proxy-video?url=${encodeURIComponent(u)}`; return u; }
+function openCurrentTab(url) { if (url) window.location.href = url; }
 
 export default function WorkDetailModal({ work, onClose }) {
   const acc = '#ff6600';
+  const [videoRatio, setVideoRatio] = useState(16 / 9);
+  const [showInlinePlayer, setShowInlinePlayer] = useState(false);
+  const isExternalVideo = work?.type === 'video' && /^https?:\/\//i.test(work?.file_path || '');
+  const originalUrl = work?.external_url || work?.source_url || work?.file_path;
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -11,6 +17,12 @@ export default function WorkDetailModal({ work, onClose }) {
     window.addEventListener('keydown', esc);
     return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', esc); };
   }, [onClose]);
+
+  useEffect(() => {
+    setVideoRatio(16 / 9);
+    setShowInlinePlayer(false);
+  }, [work?.id]);
+
   if (!work) return null;
 
   return (
@@ -34,9 +46,52 @@ export default function WorkDetailModal({ work, onClose }) {
         </button>
 
         {/* Media */}
-        <div style={{ background: '#080810' }}>
+        <div
+          className="w-full overflow-hidden"
+          style={{
+            background: '#080810',
+            aspectRatio: work.type === 'video' ? videoRatio : '16 / 9',
+            maxHeight: '62vh',
+          }}
+        >
           {work.type === 'video'
-            ? <video src={au(work.file_path)} controls className="w-full max-h-[55vh] object-contain" />
+            ? isExternalVideo && !showInlinePlayer
+              ? (
+                <div className="relative h-full w-full">
+                  {work.thumbnail ? (
+                    <img src={au(work.thumbnail)} alt={work.title} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full" style={{ background: 'linear-gradient(135deg, #141420, #080810)' }} />
+                  )}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.72))' }}>
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full text-2xl text-white" style={{ background: acc, boxShadow: `0 18px 45px ${acc}50` }}>▶</div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">这是外部网页视频</p>
+                      <p className="mt-1 text-xs text-white/55">站内播放器可能被对方网站限制，建议打开原网页播放。</p>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      <button type="button" onClick={() => openCurrentTab(originalUrl)} className="rounded-full px-5 py-2 text-sm font-semibold text-white" style={{ background: acc }}>
+                        打开原网页播放
+                      </button>
+                      <button type="button" onClick={() => setShowInlinePlayer(true)} className="rounded-full border border-white/20 bg-white/10 px-5 py-2 text-sm font-semibold text-white">
+                        尝试站内播放
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+              : <video
+                  src={videoSrc(work.file_path)}
+                  controls
+                  preload="metadata"
+                  className="h-full w-full object-contain"
+                  onLoadedMetadata={(event) => {
+                    const video = event.currentTarget;
+                    if (video.videoWidth && video.videoHeight) {
+                      setVideoRatio(video.videoWidth / video.videoHeight);
+                    }
+                  }}
+                />
             : work.type === 'image'
               ? <img src={au(work.file_path)} alt={work.title} className="w-full max-h-[55vh] object-contain" />
               : work.thumbnail
@@ -55,6 +110,17 @@ export default function WorkDetailModal({ work, onClose }) {
             {work.title}
           </h2>
           {work.description && <p className="mb-5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }}>{work.description}</p>}
+
+          {(work.external_url || work.source_url) && !isExternalVideo && (
+            <button
+              type="button"
+              onClick={() => openCurrentTab(work.external_url || work.source_url)}
+              className="mb-5 inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold text-white no-underline transition hover:opacity-90"
+              style={{ background: acc }}
+            >
+              打开原网页播放
+            </button>
+          )}
 
           {work.type === 'article' && work.content && (
             <div className="mt-4 pt-5 leading-relaxed space-y-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }}>

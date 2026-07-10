@@ -1,5 +1,12 @@
-import { useState, useEffect } from 'react';
-import { useTheme, txt } from '../context/ThemeContext';
+import { useEffect, useState } from 'react';
+import { RichText, txt, useTheme } from '../context/ThemeContext';
+
+function SplitTitle({ value, fallback }) {
+  const text = txt(value, fallback);
+  if (value?.chars?.some(Boolean)) return <RichText value={value} fallback={fallback} />;
+  if (text.length <= 2) return text;
+  return <>{text.slice(0, -2)}<span style={{ color: '#ff6600' }}>{text.slice(-2)}</span></>;
+}
 
 export default function Contact() {
   const t = useTheme();
@@ -8,81 +15,43 @@ export default function Contact() {
   const email = txt(t?.contactEmail, 'ccy@ccyspace.icu');
 
   useEffect(() => {
-    fetch('/api/contact/resume').then(r => r.json()).then(d => { if (d?.url) setResume(d); }).catch(() => {});
+    fetch('/api/contact/resume').then((r) => r.json()).then((d) => { if (d?.url) setResume(d); }).catch(() => {});
   }, []);
 
   return (
-    <section id="contact" className="relative py-36 px-8 md:px-20" style={{ background: '#08080c' }}>
-      <div className="max-w-7xl mx-auto">
-        {/* 03 Contact */}
-        <div className="flex items-center gap-4 mb-20">
-          <span className="text-xs font-semibold tracking-[0.25em]" style={{ color: acc }}>03</span>
-          <div className="w-6 h-px" style={{ background: 'rgba(255,255,255,0.12)' }} />
-          <span className="text-[11px] tracking-[0.3em] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Contact</span>
+    <section id="contact" className="relative px-6 py-28 md:px-20" style={{ background: '#fff' }}>
+      <div className="mx-auto max-w-5xl">
+        <div className="text-center">
+          <h2 className="text-gray-900" style={{ fontFamily: "'Playfair Display', 'Noto Serif SC', serif", fontSize: 'clamp(42px, 4vw, 58px)', fontWeight: 900, lineHeight: 1.1 }}>
+            <SplitTitle value={t?.contactTitle} fallback="联系合作" />
+          </h2>
+          <RichText as="p" value={t?.contactSubtitle} fallback="Get in Touch" className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }} />
         </div>
 
-        <div className="grid md:grid-cols-2 gap-20">
-          {/* LEFT: Heading */}
-          <div>
-            <h2 className="font-black leading-none text-white"
-              style={{ fontFamily: "'Playfair Display', serif", fontSize: 'clamp(36px, 5vw, 64px)' }}>
-              {txt(t?.contactTitle, 'Get in')}<br />
-              <span style={{ color: acc }}>Touch</span>
-            </h2>
-            <p className="text-sm mt-6" style={{ color: 'rgba(255,255,255,0.28)' }}>
-              {txt(t?.contactSubtitle, '合作联系')}
-            </p>
+        <div className="mx-auto mt-16 max-w-xl rounded-2xl border bg-white p-10 shadow-lg" style={{ borderColor: '#eef0f4', boxShadow: '0 22px 50px rgba(17,24,39,0.1)' }}>
+          <div className="space-y-8">
+            <div className="flex items-center gap-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full text-white" style={{ background: '#6d67d8' }}>✉</div>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#a0a6b3' }}>邮箱</p>
+                <a href={`mailto:${email}`} className="text-lg font-bold text-gray-900 no-underline"><RichText value={t?.contactEmail} fallback="ccy@ccyspace.icu" /></a>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full text-white" style={{ background: acc }}>⌖</div>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#a0a6b3' }}>位置</p>
+                <RichText as="p" value={t?.contactLocation} fallback="中国 · 在线" className="text-lg font-bold text-gray-900" />
+              </div>
+            </div>
+
+            {resume && <a href={resume.url} target="_blank" rel="noopener noreferrer" className="block rounded-xl px-4 py-3 text-sm font-semibold no-underline" style={{ background: '#f7f8fb', color: '#687083' }}>查看附件：{resume.name}</a>}
           </div>
 
-          {/* RIGHT: Contact details */}
-          <div className="space-y-14">
-            {/* Email */}
-            <div className="group">
-              <p className="text-[10px] tracking-[0.3em] uppercase mb-5" style={{ color: 'rgba(255,255,255,0.18)' }}>Email</p>
-              <a href={'mailto:' + email}
-                className="text-2xl md:text-[28px] font-semibold text-white no-underline transition-all duration-300 group-hover:opacity-60"
-                style={{ wordBreak: 'break-all' }}>
-                {email}
-                <span className="inline-block ml-3 text-lg opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-[-8px] group-hover:translate-x-0" style={{ color: acc }}>↗</span>
-              </a>
-            </div>
-
-            {/* Location */}
-            <div>
-              <p className="text-[10px] tracking-[0.3em] uppercase mb-5" style={{ color: 'rgba(255,255,255,0.18)' }}>Location</p>
-              <p className="text-2xl md:text-[28px] font-semibold text-white">
-                {txt(t?.contactLocation, '中国 · 在线')}
-              </p>
-            </div>
-
-            {/* Resume */}
-            {resume && (
-              <div>
-                <p className="text-[10px] tracking-[0.3em] uppercase mb-5" style={{ color: 'rgba(255,255,255,0.18)' }}>Resume</p>
-                <a href={'https://portfolio-production-913f.up.railway.app' + resume.url}
-                  target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-base font-semibold text-white no-underline transition-all duration-300 hover:opacity-60">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: acc }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  {resume.name}
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                </a>
-              </div>
-            )}
-
-            {/* Send button */}
-            <a href={'mailto:' + email}
-              className="mt-8 inline-flex items-center gap-2 px-10 py-4 rounded-full text-sm font-semibold text-white no-underline transition-all duration-500 hover:scale-105 relative overflow-hidden group"
-              style={{ background: acc }}>
-              <span className="relative z-10">{txt(t?.contactBtnText, '发送邮件')}</span>
-              <svg className="w-4 h-4 relative z-10 transition-transform duration-300 group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                style={{ background: `linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)` }} />
+          <div className="mt-10 text-center">
+            <a href={`mailto:${email}`} className="inline-flex items-center gap-2 rounded-full px-9 py-3 text-sm font-bold text-white no-underline transition-transform hover:scale-105" style={{ background: acc }}>
+              ✉ <RichText value={t?.contactBtnText} fallback="发送邮件" />
             </a>
           </div>
         </div>

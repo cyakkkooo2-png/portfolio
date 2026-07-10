@@ -1,8 +1,123 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { uploadWorkWithProgress } from '../../api';
 import ProgressBar from '../../components/ProgressBar';
 import StorageBar from '../../components/StorageBar';
+
+const TYPES = [
+  { key: 'video', label: '视频', icon: '🎬' },
+  { key: 'image', label: '图片', icon: '🖼️' },
+  { key: 'article', label: '文章', icon: '📄' },
+];
+
+function UtilityUploadCard({ title, description, accept, fieldName, endpoint, buttonText }) {
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  async function upload() {
+    if (!file) {
+      setMessage('请先选择文件');
+      return;
+    }
+
+    setBusy(true);
+    setMessage('');
+    try {
+      const fd = new FormData();
+      fd.append(fieldName, file);
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '上传失败');
+      setFile(null);
+      setMessage('上传成功');
+    } catch (err) {
+      setMessage(err.message || '上传失败');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <h2 className="text-base font-bold text-gray-900">{title}</h2>
+      <p className="mt-1 text-sm text-gray-400">{description}</p>
+      <div className="mt-4">
+        <input
+          type="file"
+          accept={accept}
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+        />
+        {file && <p className="mt-2 text-xs text-gray-400">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
+      </div>
+      <button type="button" disabled={busy} onClick={upload} className="mt-4 rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-50">
+        {busy ? '上传中...' : buttonText}
+      </button>
+      {message && <p className="mt-2 text-xs text-gray-500">{message}</p>}
+    </div>
+  );
+}
+
+function UrlImportCard({ onImported }) {
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  async function importUrl() {
+    if (!url.trim()) {
+      setMessage('请先粘贴网页链接');
+      return;
+    }
+
+    setBusy(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/works/import-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '导入失败');
+      setUrl('');
+      setMessage(`导入成功：${data.work?.title || '新作品'}`);
+      onImported?.(data.work);
+    } catch (err) {
+      setMessage(err.message || '导入失败');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-5 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end">
+        <div className="flex-1">
+          <h2 className="text-base font-bold text-gray-900">网页链接导入</h2>
+          <p className="mt-1 text-sm text-gray-500">粘贴视频页或文章页链接，自动抓取标题、简介、封面和公开视频地址。</p>
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            className="mt-4 w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            placeholder="https://pconline.pcvideo.com.cn/video-37670.html"
+          />
+        </div>
+        <button type="button" disabled={busy} onClick={importUrl} className="rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
+          {busy ? '导入中...' : '导入链接'}
+        </button>
+      </div>
+      {message && <p className="mt-3 text-xs text-gray-500">{message}</p>}
+    </div>
+  );
+}
 
 export default function UploadWork() {
   const navigate = useNavigate();
@@ -21,109 +136,157 @@ export default function UploadWork() {
     e.preventDefault();
     if (!title.trim()) return setError('请输入标题');
     if (type !== 'article' && !file) return setError('请选择文件');
-    if (type === 'article' && !content.trim()) return setError('请输入内容');
+    if (type === 'article' && !content.trim()) return setError('请输入文章内容');
 
-    setUploading(true); setError('');
-    const fName = file?.name || title;
-    setProgress({ percent: 0, speed: '', fileName: fName });
+    setUploading(true);
+    setError('');
+    const fileName = file?.name || title;
+    setProgress({ percent: 0, speed: '', fileName });
 
-    let timer = null, lastPct = 0;
+    let timer = null;
+    let lastPct = 0;
     try {
       const fd = new FormData();
-      fd.append('title', title); fd.append('description', description);
-      fd.append('type', type); fd.append('content', content);
-      fd.append('tags', JSON.stringify(tags.split(',').map(t => t.trim()).filter(Boolean)));
+      fd.append('title', title);
+      fd.append('description', description);
+      fd.append('type', type);
+      fd.append('content', content);
+      fd.append('tags', JSON.stringify(tags.split(',').map((tag) => tag.trim()).filter(Boolean)));
       if (file) fd.append(type === 'video' ? 'video' : 'image', file);
       if (cover) fd.append('cover', cover);
 
       await uploadWorkWithProgress(fd, {
         method: 'POST',
-        onProgress: p => {
+        onProgress: (p) => {
           lastPct = p.percent;
-          setProgress({ percent: p.percent, speed: p.speed || '', fileName: fName });
+          setProgress({ percent: p.percent, speed: p.speed || '', fileName });
           if (p.percent >= 90 && !timer) {
             timer = setInterval(() => {
               lastPct = Math.min(99, lastPct + 1);
-              setProgress({ percent: lastPct, speed: '保存至云存储...', fileName: fName });
+              setProgress({ percent: lastPct, speed: '保存到云存储...', fileName });
             }, 800);
           }
         },
       });
+
       if (timer) clearInterval(timer);
-      setProgress({ percent: 100, speed: '', fileName: fName });
-      await new Promise(r => setTimeout(r, 500));
-      navigate('/admin');
+      setProgress({ percent: 100, speed: '', fileName });
+      setTimeout(() => navigate('/admin'), 500);
     } catch (err) {
       if (timer) clearInterval(timer);
       setError(err.message || '上传失败');
-    } finally { setUploading(false); }
+    } finally {
+      setUploading(false);
+    }
   }
 
-  const cls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputClass = 'w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100';
 
   return (
-    <div className="min-h-screen" style={{ background: '#13151a' }}>
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <a href="/admin" className="text-sm text-gray-500 hover:text-gray-300 mb-4 inline-block">← 返回管理</a>
-        <h1 className="text-2xl font-bold text-white mb-2">📤 上传内容</h1>
-        <p className="text-sm text-gray-400 mb-6">上传视频、图片或文章</p>
+    <div className="min-h-screen bg-white text-gray-900">
+      <header className="h-16 border-b border-gray-100 bg-white">
+        <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-6">
+          <Link to="/" className="text-xl font-black text-gray-900 no-underline" style={{ fontFamily: "'Playfair Display', serif" }}>
+            CCY<span className="text-orange-500">.</span>SPACE
+          </Link>
+          <div className="flex items-center gap-4 text-sm">
+            <Link to="/" className="rounded-full border border-gray-200 px-4 py-2 text-gray-500 no-underline hover:bg-gray-50">← 返回首页</Link>
+            <Link to="/admin" className="rounded-full bg-orange-500 px-5 py-2 font-bold text-white no-underline">⚙ 管理后台</Link>
+            <button type="button" className="text-gray-300">退出</button>
+          </div>
+        </div>
+      </header>
 
-        <div className="space-y-5">
+      <main className="mx-auto max-w-2xl px-6 py-8">
+        <p className="mb-6 text-center text-sm text-gray-400">上传视频、图片、文章、简历和关于我图片到你的空间</p>
+
+        <div className="mb-5 rounded-xl border border-gray-200 bg-white p-5">
           <StorageBar />
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-5">
-            {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">{error}</div>}
+        </div>
 
+        <UrlImportCard onImported={() => setTimeout(() => navigate('/admin'), 900)} />
+
+        <div className="mb-5 grid gap-4 md:grid-cols-2">
+          <UtilityUploadCard
+            title="简历上传"
+            description="支持 PDF、Word、压缩包或图片，会显示在联系区附件。"
+            accept=".pdf,.doc,.docx,.zip,.jpg,.png"
+            fieldName="file"
+            endpoint="/api/contact/resume"
+            buttonText="上传简历"
+          />
+          <UtilityUploadCard
+            title="关于我图片"
+            description="上传后会显示在首页“关于我”左侧。"
+            accept="image/*"
+            fieldName="image"
+            endpoint="/api/theme/about-image"
+            buttonText="上传关于我图片"
+          />
+        </div>
+
+        <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-1 text-base font-bold text-gray-900">作品上传</h2>
+          <p className="mb-5 text-sm text-gray-400">上传视频、图片或文章。</p>
+
+          {error && <div className="mb-5 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+
+          <label className="mb-2 block text-sm font-medium text-gray-700">类型</label>
+          <div className="mb-5 flex gap-3">
+            {TYPES.map((item) => (
+              <button key={item.key} type="button" onClick={() => setType(item.key)} className={`rounded-lg border px-5 py-2 text-sm font-semibold transition ${type === item.key ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}>
+                {item.icon} {item.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">类型</label>
-              <div className="flex gap-3">
-                {[{ key: 'video', label: '🎬 视频' }, { key: 'image', label: '🖼️ 图片' }, { key: 'article', label: '📝 文章' }].map(t => (
-                  <button key={t.key} type="button" onClick={() => setType(t.key)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${type === t.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'}`}>{t.label}</button>
-                ))}
-              </div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">标题 *</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder="输入标题" required />
             </div>
 
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">标题 *</label>
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)} className={cls} placeholder="输入标题" required /></div>
-
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">描述</label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className={cls} placeholder="简短描述..." /></div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">描述</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={inputClass} placeholder="简短描述..." />
+            </div>
 
             {type !== 'article' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{type === 'video' ? '视频文件 *' : '图片文件 *'}</label>
-                <input type="file" accept={type === 'video' ? 'video/*' : 'image/*'} onChange={e => setFile(e.target.files[0])}
-                  className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700" />
-                {file && <p className="text-xs text-gray-400 mt-1">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
+                <label className="mb-2 block text-sm font-medium text-gray-700">{type === 'video' ? '视频文件 *' : '图片文件 *'}</label>
+                <input type="file" accept={type === 'video' ? 'video/*' : 'image/*'} onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
+                {file && <p className="mt-1 text-xs text-gray-400">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
               </div>
             )}
 
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">封面图（可选）</label>
-              <input type="file" accept="image/*" onChange={e => setCover(e.target.files[0])}
-                className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700" /></div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">封面图（可选）</label>
+              <input type="file" accept="image/*" onChange={(e) => setCover(e.target.files?.[0] || null)} className="w-full text-sm text-gray-500 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
+            </div>
 
             {type === 'article' && (
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">文章内容 *</label>
-                <textarea value={content} onChange={e => setContent(e.target.value)} rows={10}
-                  className={"font-mono text-sm " + cls} placeholder="## 标题&#10;&#10;正文..." required /></div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">文章内容 *</label>
+                <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} className={`${inputClass} font-mono`} placeholder="## 标题&#10;&#10;正文..." required />
+              </div>
             )}
 
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">标签（逗号分隔）</label>
-              <input type="text" value={tags} onChange={e => setTags(e.target.value)} className={cls} placeholder="设计, UI, 插画" /></div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">标签（逗号分隔）</label>
+              <input value={tags} onChange={(e) => setTags(e.target.value)} className={inputClass} placeholder="设计, UI, 插画" />
+            </div>
 
             {uploading && progress && <ProgressBar percent={progress.percent} fileName={progress.fileName} speed={progress.speed} />}
 
             <div className="flex gap-3 pt-2">
-              <button type="submit" disabled={uploading}
-                className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                {uploading ? '上传中...' : '上传'}
+              <button type="submit" disabled={uploading} className="flex-1 rounded-lg bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
+                {uploading ? '上传中...' : '上传作品'}
               </button>
-              <button type="button" onClick={() => navigate('/admin')}
-                className="px-6 py-2 bg-gray-100 text-gray-600 rounded-lg font-medium hover:bg-gray-200 transition-colors">取消</button>
+              <button type="button" onClick={() => navigate('/admin')} className="rounded-lg bg-gray-100 px-7 py-3 font-semibold text-gray-600 transition hover:bg-gray-200">取消</button>
             </div>
-          </form>
-        </div>
-      </div>
+          </div>
+        </form>
+      </main>
     </div>
   );
 }

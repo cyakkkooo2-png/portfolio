@@ -44,6 +44,8 @@ function createWork(data) {
     file_size: data.file_size || null, // bytes
     content: data.content || '',
     thumbnail: data.thumbnail || '',
+    source_url: data.source_url || '',
+    external_url: data.external_url || '',
     tags: data.tags || [],
     created_at: new Date().toISOString(),
   };

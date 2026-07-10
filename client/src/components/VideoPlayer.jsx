@@ -1,5 +1,9 @@
 export default function VideoPlayer({ src, title }) {
-  const videoUrl = src?.startsWith('/uploads/') ? 'https://portfolio-production-913f.up.railway.app' + src : src;
+  const videoUrl = src?.startsWith('/uploads/')
+    ? 'https://portfolio-production-913f.up.railway.app' + src
+    : /^https?:\/\//i.test(src || '')
+      ? `/api/works/proxy-video?url=${encodeURIComponent(src)}`
+      : src;
 
   if (!videoUrl) {
     return (
@@ -11,7 +15,7 @@ export default function VideoPlayer({ src, title }) {
 
   return (
     <div className="rounded-lg overflow-hidden bg-black">
-      <video src={videoUrl} controls className="w-full max-h-[70vh]" title={title} preload="metadata" crossOrigin="anonymous">
+      <video src={videoUrl} controls className="w-full max-h-[70vh]" title={title} preload="metadata">
         您的浏览器不支持视频播放
       </video>
     </div>

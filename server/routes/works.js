@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { Readable } = require('stream');
 const db = require('../db/database');
 const { authMiddleware } = require('../middleware/auth');
 const githubStorage = require('../github-storage');
@@ -40,6 +41,90 @@ const upload = multer({
     cb(pattern?.test(path.extname(file.originalname)) ? null : new Error('不支持的文件格式'), pattern?.test(path.extname(file.originalname)));
   },
 });
+
+function decodeHtml(value = '') {
+  return String(value)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
+function pick(html, patterns) {
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) return decodeHtml(match[1].replace(/<[^>]+>/g, ''));
+  }
+  return '';
+}
+
+function pickAll(html, pattern) {
+  return [...html.matchAll(pattern)].map(m => decodeHtml(m[1])).filter(Boolean);
+}
+
+async function fetchHtml(url) {
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml',
+    },
+  });
+  if (!response.ok) throw new Error(`网页读取失败 (${response.status})`);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const type = response.headers.get('content-type') || '';
+  const charset = /charset=([^;]+)/i.exec(type)?.[1] || /<meta[^>]+charset=["']?([^"'\s/>]+)/i.exec(buffer.toString('latin1'))?.[1] || 'utf-8';
+  try {
+    return new TextDecoder(charset.toLowerCase()).decode(buffer);
+  } catch {
+    return buffer.toString('utf8');
+  }
+}
+
+async function extractFromUrl(inputUrl) {
+  let pageUrl = inputUrl.trim();
+  if (!/^https?:\/\//i.test(pageUrl)) throw new Error('请输入完整链接，例如 https://...');
+
+  const pcVideoId = /pconline\.pcvideo\.com\.cn\/video-(\d+)\.html/i.exec(pageUrl)?.[1];
+  if (pcVideoId) pageUrl = `https://mpconline.pcvideo.com.cn/${pcVideoId}.html`;
+
+  const html = await fetchHtml(pageUrl);
+  const sourceUrl = pageUrl;
+  const title = pick(html, [
+    /<p[^>]+class=["'][^"']*\btit\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i,
+    /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
+    /<title[^>]*>([\s\S]*?)<\/title>/i,
+  ]).replace(/[-_]?太平洋科技视频?$|[-_]?太平洋科技$/g, '').trim();
+  const description = pick(html, [
+    /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
+    /<p[^>]+class=["'][^"']*\bdesc\b[^"']*["'][^>]*>[\s\S]*?<span[^>]*>[^<]*<\/span>([\s\S]*?)<\/p>/i,
+    /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,
+  ]);
+  const thumbnail = pick(html, [
+    /<video[^>]+poster=["']([^"']+)["']/i,
+    /"images"\s*:\s*\[\s*["']([^"']+)["']/i,
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+  ]);
+  const videoUrl = pick(html, [
+    /<source[^>]+src=["']([^"']+\.mp4[^"']*)["']/i,
+    /<video[^>]+src=["']([^"']+\.mp4[^"']*)["']/i,
+  ]);
+  const tags = pickAll(html, /<span[^>]+class=["'][^"']*\btag\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi);
+
+  return {
+    title: title || '未命名作品',
+    description,
+    type: videoUrl ? 'video' : 'article',
+    file_path: videoUrl,
+    thumbnail,
+    content: videoUrl ? '' : description,
+    tags,
+    source_url: inputUrl.trim(),
+    external_url: sourceUrl,
+  };
+}
 
 async function uploadToStorage(tmpPath, folder, filename) {
   if (folder === 'videos') {
@@ -91,6 +176,44 @@ router.get('/', (req, res) => {
   res.json({ works });
 });
 
+// GET /api/works/proxy-video?url=...
+// Browser playback can fail when an imported external MP4 is embedded directly.
+// This streams only URLs that already exist in saved works, so it cannot be used as an open proxy.
+router.get('/proxy-video', async (req, res) => {
+  try {
+    const url = String(req.query.url || '');
+    if (!/^https?:\/\//i.test(url)) return res.status(400).send('Invalid video URL');
+
+    const allowed = db.getWorks().some(work => work.file_path === url && work.type === 'video');
+    if (!allowed) return res.status(403).send('Video URL is not in works');
+
+    const upstream = await fetch(url, {
+      headers: {
+        'User-Agent': req.get('user-agent') || 'Mozilla/5.0',
+        Accept: req.get('accept') || '*/*',
+        Range: req.get('range') || '',
+      },
+    });
+
+    if (!upstream.ok && upstream.status !== 206) {
+      return res.status(upstream.status).send('Video source unavailable');
+    }
+
+    res.status(upstream.status);
+    ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control', 'last-modified', 'etag'].forEach((name) => {
+      const value = upstream.headers.get(name);
+      if (value) res.setHeader(name, value);
+    });
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    if (!upstream.body) return res.end();
+    Readable.fromWeb(upstream.body).pipe(res);
+  } catch (err) {
+    console.error('Proxy video error:', err);
+    res.status(500).send('Video proxy failed');
+  }
+});
+
 // GET /api/works/:id
 router.get('/:id', (req, res) => {
   const work = db.getWorkById(req.params.id);
@@ -140,6 +263,21 @@ router.post('/', authMiddleware, upload.fields([
   } catch (err) {
     console.error('Create error:', err);
     res.status(500).json({ error: '上传失败: ' + err.message });
+  }
+});
+
+// POST /api/works/import-url
+router.post('/import-url', authMiddleware, async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url) return res.status(400).json({ error: '请输入网页链接' });
+
+    const data = await extractFromUrl(url);
+    const work = db.createWork(data);
+    res.status(201).json({ work, extracted: data });
+  } catch (err) {
+    console.error('Import URL error:', err);
+    res.status(500).json({ error: '导入失败: ' + err.message });
   }
 });
 
