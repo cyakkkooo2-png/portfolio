@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const FONTS = ['Playfair Display', 'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', 'SimHei', 'KaiTi', 'Arial', 'Georgia'];
 
@@ -10,7 +11,7 @@ function textOf(data) {
 
 function normalizeChars(text, chars) {
   const source = Array.isArray(chars) ? chars : [];
-  return Array.from(text).map((_, i) => source[i] || {});
+  return Array.from(text).map((_, index) => source[index] || {});
 }
 
 function sameTheme(a, b) {
@@ -21,64 +22,57 @@ function FontSelect({ value, onChange }) {
   const isCustom = value && !FONTS.includes(value);
   return (
     <div className="flex">
-      <select value={isCustom ? '__custom__' : (value || 'Inter')} onChange={(e) => { if (e.target.value !== '__custom__') onChange(e.target.value); }} className="w-1/2 rounded-l-lg border border-gray-200 bg-white px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-100">
+      <select value={isCustom ? '__custom__' : (value || 'Inter')} onChange={(e) => { if (e.target.value !== '__custom__') onChange(e.target.value); }} className="w-1/2 rounded-l-lg border border-gray-200 bg-white px-2 py-2 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-blue-100">
         {FONTS.map((font) => <option key={font} value={font}>{font}</option>)}
         <option value="__custom__">自定义...</option>
       </select>
-      <input value={isCustom ? value : ''} onChange={(e) => onChange(e.target.value || 'Inter')} placeholder="字体名" className="w-1/2 rounded-r-lg border border-l-0 border-gray-200 bg-white px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-100" />
+      <input value={isCustom ? value : ''} onChange={(e) => onChange(e.target.value || 'Inter')} placeholder="字体名" className="w-1/2 rounded-r-lg border border-l-0 border-gray-200 bg-white px-2 py-2 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-blue-100" />
     </div>
   );
 }
 
 function RichFieldEditor({ label, data, onChange }) {
-  const d = typeof data === 'object' && data ? data : { text: data || '' };
-  const text = textOf(d);
+  const value = typeof data === 'object' && data ? data : { text: data || '' };
+  const text = textOf(value);
   const chars = useMemo(() => Array.from(text), [text]);
   const [selected, setSelected] = useState([]);
-  const styles = normalizeChars(text, d.chars);
-  const selectedIndexes = selected.filter((i) => i >= 0 && i < chars.length);
+  const styles = normalizeChars(text, value.chars);
+  const selectedIndexes = selected.filter((index) => index >= 0 && index < chars.length);
   const activeIndexes = selectedIndexes.length ? selectedIndexes : (chars.length ? [0] : []);
-  const first = activeIndexes[0] ?? 0;
-  const current = styles[first] || {};
+  const current = styles[activeIndexes[0] || 0] || {};
 
   function updateText(nextText) {
-    const nextChars = normalizeChars(nextText, d.chars);
+    const nextChars = normalizeChars(nextText, value.chars);
     const max = Array.from(nextText).length - 1;
-    setSelected((prev) => prev.filter((i) => i <= max));
-    onChange({ ...d, text: nextText, chars: nextChars });
+    setSelected((prev) => prev.filter((index) => index <= max));
+    onChange({ ...value, text: nextText, chars: nextChars });
   }
 
   function updateBase(patch) {
-    onChange({ ...d, ...patch, chars: styles });
+    onChange({ ...value, ...patch, chars: styles });
   }
 
   function updateSelected(patch) {
-    const targets = activeIndexes.length ? activeIndexes : [];
-    const next = styles.map((item, i) => targets.includes(i) ? { ...item, ...patch } : item);
-    onChange({ ...d, chars: next });
+    const next = styles.map((item, index) => activeIndexes.includes(index) ? { ...item, ...patch } : item);
+    onChange({ ...value, chars: next });
   }
 
   function toggleIndex(index) {
-    setSelected((prev) => prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index].sort((a, b) => a - b));
+    setSelected((prev) => prev.includes(index) ? prev.filter((item) => item !== index) : [...prev, index].sort((a, b) => a - b));
   }
 
   function selectAll() {
-    setSelected(chars.map((_, i) => i));
-  }
-
-  function clearSelection() {
-    setSelected([]);
+    setSelected(chars.map((_, index) => index));
   }
 
   function clearSelectedStyle() {
-    const targets = activeIndexes.length ? activeIndexes : [];
-    const next = styles.map((item, i) => targets.includes(i) ? {} : item);
-    onChange({ ...d, chars: next });
+    const next = styles.map((item, index) => activeIndexes.includes(index) ? {} : item);
+    onChange({ ...value, chars: next });
   }
 
   function applyBaseToAll() {
-    const next = styles.map(() => ({ font: d.font || 'Inter', size: d.size || 16, color: d.color || '#111111' }));
-    onChange({ ...d, chars: next });
+    const next = styles.map(() => ({ font: value.font || 'Inter', size: value.size || 16, color: value.color || '#111111' }));
+    onChange({ ...value, chars: next });
     selectAll();
   }
 
@@ -90,22 +84,22 @@ function RichFieldEditor({ label, data, onChange }) {
       </div>
 
       <label className="mb-1 block text-xs font-medium text-gray-500">文字内容</label>
-      <textarea value={text} onChange={(e) => updateText(e.target.value)} rows={text.length > 34 ? 3 : 1} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100" />
+      <textarea value={text} onChange={(e) => updateText(e.target.value)} rows={text.length > 34 ? 3 : 1} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-100" />
 
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_80px_130px]">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500">默认字体</label>
-          <FontSelect value={d.font || 'Inter'} onChange={(font) => updateBase({ font })} />
+          <FontSelect value={value.font || 'Inter'} onChange={(font) => updateBase({ font })} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500">默认字号</label>
-          <input type="number" value={d.size || 16} onChange={(e) => updateBase({ size: parseInt(e.target.value, 10) || 16 })} className="w-full rounded-lg border border-gray-200 px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-100" />
+          <input type="number" value={value.size || 16} onChange={(e) => updateBase({ size: parseInt(e.target.value, 10) || 16 })} className="w-full rounded-lg border border-gray-200 px-2 py-2 text-xs text-gray-900 outline-none focus:ring-2 focus:ring-blue-100" />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500">默认颜色</label>
           <div className="flex gap-1">
-            <input type="color" value={d.color || '#111111'} onChange={(e) => updateBase({ color: e.target.value })} className="h-9 w-9 rounded border-0 p-0" />
-            <input value={d.color || '#111111'} onChange={(e) => updateBase({ color: e.target.value })} className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-2 text-xs font-mono outline-none" />
+            <input type="color" value={value.color || '#111111'} onChange={(e) => updateBase({ color: e.target.value })} className="h-9 w-9 rounded border-0 p-0" />
+            <input value={value.color || '#111111'} onChange={(e) => updateBase({ color: e.target.value })} className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-2 font-mono text-xs text-gray-900 outline-none" />
           </div>
         </div>
       </div>
@@ -115,14 +109,14 @@ function RichFieldEditor({ label, data, onChange }) {
           <p className="text-xs font-medium text-gray-500">选择要批量修改的字，可多选</p>
           <div className="flex gap-2">
             <button type="button" onClick={selectAll} className="rounded-full bg-white px-3 py-1 text-xs text-gray-600 ring-1 ring-gray-200 hover:bg-gray-100">全选</button>
-            <button type="button" onClick={clearSelection} className="rounded-full bg-white px-3 py-1 text-xs text-gray-600 ring-1 ring-gray-200 hover:bg-gray-100">取消选择</button>
+            <button type="button" onClick={() => setSelected([])} className="rounded-full bg-white px-3 py-1 text-xs text-gray-600 ring-1 ring-gray-200 hover:bg-gray-100">取消选择</button>
           </div>
         </div>
         <div className="flex max-h-28 flex-wrap gap-1.5 overflow-auto">
-          {chars.map((char, i) => {
-            const isSelected = selectedIndexes.includes(i);
+          {chars.map((char, index) => {
+            const isSelected = selectedIndexes.includes(index);
             return (
-              <button key={`${char}-${i}`} type="button" onClick={() => toggleIndex(i)} className={`h-8 min-w-8 rounded-lg border px-2 text-sm transition ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-200'}`} title={`第 ${i + 1} 个字`}>
+              <button key={`${char}-${index}`} type="button" onClick={() => toggleIndex(index)} className={`h-8 min-w-8 rounded-lg border px-2 text-sm transition ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-200'}`} title={`第 ${index + 1} 个字`}>
                 {char === ' ' ? '空格' : char}
               </button>
             );
@@ -140,17 +134,17 @@ function RichFieldEditor({ label, data, onChange }) {
           <div className="grid gap-3 md:grid-cols-[1fr_80px_130px]">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-500">字体</label>
-              <FontSelect value={current.font || d.font || 'Inter'} onChange={(font) => updateSelected({ font })} />
+              <FontSelect value={current.font || value.font || 'Inter'} onChange={(font) => updateSelected({ font })} />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-500">字号</label>
-              <input type="number" value={current.size || d.size || 16} onChange={(e) => updateSelected({ size: parseInt(e.target.value, 10) || 16 })} className="w-full rounded-lg border border-gray-200 px-2 py-2 text-xs outline-none" />
+              <input type="number" value={current.size || value.size || 16} onChange={(e) => updateSelected({ size: parseInt(e.target.value, 10) || 16 })} className="w-full rounded-lg border border-gray-200 px-2 py-2 text-xs text-gray-900 outline-none" />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-500">颜色</label>
               <div className="flex gap-1">
-                <input type="color" value={current.color || d.color || '#111111'} onChange={(e) => updateSelected({ color: e.target.value })} className="h-9 w-9 rounded border-0 p-0" />
-                <input value={current.color || d.color || '#111111'} onChange={(e) => updateSelected({ color: e.target.value })} className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-2 text-xs font-mono outline-none" />
+                <input type="color" value={current.color || value.color || '#111111'} onChange={(e) => updateSelected({ color: e.target.value })} className="h-9 w-9 rounded border-0 p-0" />
+                <input value={current.color || value.color || '#111111'} onChange={(e) => updateSelected({ color: e.target.value })} className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-2 font-mono text-xs text-gray-900 outline-none" />
               </div>
             </div>
           </div>
@@ -159,10 +153,10 @@ function RichFieldEditor({ label, data, onChange }) {
 
       <div className="mt-4 rounded-lg border border-gray-100 bg-white p-3">
         <p className="mb-2 text-xs font-medium text-gray-400">预览</p>
-        <p style={{ fontFamily: `"${d.font || 'Inter'}"`, fontSize: `${d.size || 16}px`, color: d.color || '#111111' }}>
-          {chars.map((char, i) => {
-            const cs = styles[i] || {};
-            return <span key={`${char}-preview-${i}`} style={{ ...(cs.font ? { fontFamily: `"${cs.font}"` } : {}), ...(cs.size ? { fontSize: `${cs.size}px` } : {}), ...(cs.color ? { color: cs.color } : {}) }}>{char}</span>;
+        <p style={{ fontFamily: `"${value.font || 'Inter'}"`, fontSize: `${value.size || 16}px`, color: value.color || '#111111' }}>
+          {chars.map((char, index) => {
+            const charStyle = styles[index] || {};
+            return <span key={`${char}-preview-${index}`} style={{ ...(charStyle.font ? { fontFamily: `"${charStyle.font}"` } : {}), ...(charStyle.size ? { fontSize: `${charStyle.size}px` } : {}), ...(charStyle.color ? { color: charStyle.color } : {}) }}>{char}</span>;
           })}
         </p>
       </div>
@@ -179,12 +173,12 @@ function AboutImageUpload({ theme, onTheme, pushHistory }) {
     if (!file) return setMessage('请先选择图片');
     setBusy(true);
     setMessage('');
-    const fd = new FormData();
-    fd.append('image', file);
+    const formData = new FormData();
+    formData.append('image', file);
     const res = await fetch('/api/theme/about-image', {
       method: 'POST',
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      body: fd,
+      body: formData,
     });
     const data = await res.json();
     if (res.ok) {
@@ -222,9 +216,14 @@ export default function SiteEditor() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState('hero');
+  const { logout } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('/api/theme').then((r) => r.json()).then((data) => { setTheme(data); setLoading(false); });
+    fetch('/api/theme').then((r) => r.json()).then((data) => {
+      setTheme(data);
+      setLoading(false);
+    });
   }, []);
 
   function pushHistory(snapshot = theme) {
@@ -283,6 +282,11 @@ export default function SiteEditor() {
     return <RichFieldEditor key={key} label={label} data={theme?.[key]} onChange={(next) => update(key, next)} />;
   }
 
+  function handleLogout() {
+    logout();
+    navigate('/');
+  }
+
   const tabs = [
     { k: 'hero', l: 'Hero 区' },
     { k: 'works', l: '作品区' },
@@ -299,9 +303,9 @@ export default function SiteEditor() {
         <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-6">
           <Link to="/" className="text-xl font-black text-gray-900 no-underline" style={{ fontFamily: "'Playfair Display', serif" }}>CCY<span className="text-orange-500">.</span>SPACE</Link>
           <div className="flex items-center gap-4 text-sm">
-            <Link to="/" className="rounded-full border border-gray-200 px-4 py-2 text-gray-500 no-underline hover:bg-gray-50">← 返回首页</Link>
+            <Link to="/" className="rounded-full border border-gray-200 px-4 py-2 text-gray-600 no-underline hover:bg-gray-50">← 返回首页</Link>
             <Link to="/admin" className="rounded-full bg-orange-500 px-5 py-2 font-bold text-white no-underline">⚙ 管理后台</Link>
-            <button type="button" className="text-gray-300">退出</button>
+            <button type="button" onClick={handleLogout} className="font-medium text-gray-700 hover:text-gray-950">退出</button>
           </div>
         </div>
       </header>
@@ -309,7 +313,7 @@ export default function SiteEditor() {
       <main className="mx-auto max-w-4xl px-6 py-8">
         <div className="mb-6 text-center">
           <h1 className="text-xl font-bold text-gray-900">网站设置</h1>
-          <p className="mt-1 text-sm text-gray-400">每个字都可以单独或批量修改字体、字号和颜色</p>
+          <p className="mt-1 text-sm text-gray-500">每个字都可以单独或批量修改字体、字号和颜色</p>
         </div>
 
         <div className="mb-5 flex flex-wrap justify-center gap-2">
@@ -319,7 +323,7 @@ export default function SiteEditor() {
         </div>
 
         <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
-          <button type="button" onClick={undo} disabled={!history.length} className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-gray-50">↶ 撤回上一步</button>
+          <button type="button" onClick={undo} disabled={!history.length} className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">↶ 撤回上一步</button>
           <button type="button" onClick={resetDefaults} className="rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-600 hover:bg-orange-100">恢复默认设置</button>
         </div>
 
@@ -365,14 +369,14 @@ export default function SiteEditor() {
                 <label className="mb-2 block text-sm font-semibold text-gray-700">强调色</label>
                 <div className="flex gap-2">
                   <input type="color" value={theme?.accentColor || '#ff6600'} onChange={(e) => update('accentColor', e.target.value)} className="h-10 w-10 rounded border-0 p-0" />
-                  <input value={theme?.accentColor || '#ff6600'} onChange={(e) => update('accentColor', e.target.value)} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm" />
+                  <input value={theme?.accentColor || '#ff6600'} onChange={(e) => update('accentColor', e.target.value)} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm text-gray-900" />
                 </div>
               </div>
               <div className="rounded-xl border border-gray-200 p-4">
                 <label className="mb-2 block text-sm font-semibold text-gray-700">主色调</label>
                 <div className="flex gap-2">
                   <input type="color" value={theme?.primaryColor || '#3b82f6'} onChange={(e) => update('primaryColor', e.target.value)} className="h-10 w-10 rounded border-0 p-0" />
-                  <input value={theme?.primaryColor || '#3b82f6'} onChange={(e) => update('primaryColor', e.target.value)} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm" />
+                  <input value={theme?.primaryColor || '#3b82f6'} onChange={(e) => update('primaryColor', e.target.value)} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm text-gray-900" />
                 </div>
               </div>
             </div>

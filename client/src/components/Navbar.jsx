@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { RichText, useTheme } from '../context/ThemeContext';
 
 export default function Navbar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const { pathname } = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('hero');
@@ -37,6 +38,11 @@ export default function Navbar() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  function handleLogout() {
+    logout();
+    navigate('/');
+  }
+
   const navs = [
     { id: 'hero', key: 'navHome', fallback: '首页' },
     { id: 'work', key: 'navWork', fallback: '作品' },
@@ -44,8 +50,8 @@ export default function Navbar() {
     { id: 'contact', key: 'navContact', fallback: '联系' },
   ];
   const heroMode = home && activeSection === 'hero' && !scrolled;
-  const fg = heroMode ? '#fff' : '#374151';
-  const muted = heroMode ? 'rgba(255,255,255,0.68)' : '#6b7280';
+  const fg = heroMode ? '#fff' : '#111827';
+  const muted = heroMode ? 'rgba(255,255,255,0.78)' : '#111827';
 
   return (
     <nav className="fixed left-0 right-0 top-0 z-50 h-16 transition-all" style={{ background: heroMode ? 'transparent' : 'rgba(255,255,255,0.96)', borderBottom: heroMode ? 'none' : '1px solid #eef0f4', boxShadow: heroMode ? 'none' : '0 4px 18px rgba(17,24,39,0.04)', backdropFilter: heroMode ? 'none' : 'blur(12px)' }}>
@@ -60,7 +66,7 @@ export default function Navbar() {
           {user ? (
             <>
               <Link to="/admin" className="rounded-full px-5 py-2 text-sm font-bold text-white no-underline" style={{ background: acc }}>⚙ 管理后台</Link>
-              <span className="text-sm" style={{ color: muted }}>退出</span>
+              <button type="button" onClick={handleLogout} className="text-sm font-medium" style={{ color: muted }}>退出</button>
             </>
           ) : (
             <Link to="/login" className="text-sm font-semibold no-underline" style={{ color: muted }}>登录</Link>

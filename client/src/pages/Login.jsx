@@ -47,7 +47,7 @@ export default function Login() {
             type="text"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 caret-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="请输入用户名"
             required
           />
@@ -59,7 +59,7 @@ export default function Login() {
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 caret-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="请输入密码"
             required
           />
