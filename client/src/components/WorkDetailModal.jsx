@@ -71,7 +71,7 @@ export default function WorkDetailModal({ work, onClose }) {
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl"
+        className="relative flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl"
         style={{
           background: '#111118',
           border: '1px solid rgba(255,255,255,0.08)',
@@ -89,11 +89,11 @@ export default function WorkDetailModal({ work, onClose }) {
         </button>
 
         <div
-          className="w-full overflow-hidden"
+          className="w-full shrink-0 overflow-hidden"
           style={{
             background: '#080810',
             aspectRatio: work.type === 'video' ? videoRatio : '16 / 9',
-            maxHeight: '62vh',
+            maxHeight: work.type === 'article' ? '44vh' : '62vh',
           }}
         >
           {work.type === 'video' && isLinkOnlyVideo ? (
@@ -157,7 +157,14 @@ export default function WorkDetailModal({ work, onClose }) {
           )}
         </div>
 
-        <div className="overflow-y-auto p-6 md:p-8">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 md:p-8"
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            scrollbarColor: 'rgba(255,102,0,0.8) rgba(255,255,255,0.08)',
+            scrollbarWidth: 'thin',
+          }}
+        >
           <span className="mb-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium" style={{ background: `${acc}15`, color: acc, border: `1px solid ${acc}25` }}>
             <TypeIcon type={work.type} />
             {labels[work.type]}
