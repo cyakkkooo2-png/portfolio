@@ -93,7 +93,7 @@ export default function WorkDetailModal({ work, onClose }) {
           style={{
             background: '#080810',
             aspectRatio: work.type === 'video' ? videoRatio : '16 / 9',
-            maxHeight: work.type === 'article' ? '44vh' : '62vh',
+            maxHeight: work.type === 'article' ? '34vh' : '62vh',
           }}
         >
           {work.type === 'video' && isLinkOnlyVideo ? (
@@ -158,9 +158,10 @@ export default function WorkDetailModal({ work, onClose }) {
         </div>
 
         <div
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 md:p-8"
+          className="min-h-0 flex-1 overflow-y-scroll overscroll-contain p-6 pb-16 md:p-8 md:pb-20"
           style={{
             WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y',
             scrollbarColor: 'rgba(255,102,0,0.8) rgba(255,255,255,0.08)',
             scrollbarWidth: 'thin',
           }}

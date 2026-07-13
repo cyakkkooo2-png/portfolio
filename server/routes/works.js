@@ -111,6 +111,95 @@ function extractArticleContent(html = '') {
   return stripHtml(body);
 }
 
+function normaliseArticleBlocks(blocks = []) {
+  const seen = new Set();
+  const ignored = /^(share|comment|advertisement|related reading|copyright|open app|log in|sign in|阅读全文|打开app|登录|分享|评论|广告|相关阅读|版权声明)$/i;
+  return blocks
+    .map((block) => String(block || '').replace(/\s+/g, ' ').trim())
+    .filter((block) => block.length > 1 && !ignored.test(block))
+    .filter((block) => {
+      const key = block.replace(/^#{2,4}\s+|^[-•]\s+|^>\s+/, '').toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function articleHtmlToBlocks(fragment = '') {
+  const blocks = [];
+  const pattern = /<(h[1-4]|p|li|blockquote)[^>]*>([\s\S]*?)<\/\1>/gi;
+  let match;
+  while ((match = pattern.exec(fragment))) {
+    const tag = match[1].toLowerCase();
+    const text = stripHtml(match[2]);
+    if (!text) continue;
+    if (tag.startsWith('h')) blocks.push(`${'#'.repeat(Math.min(Number(tag[1]) + 1, 4))} ${text}`);
+    else if (tag === 'li') blocks.push(`• ${text}`);
+    else if (tag === 'blockquote') blocks.push(`> ${text}`);
+    else blocks.push(text);
+  }
+  if (blocks.length < 3) {
+    const plain = String(fragment)
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:div|section|figure|figcaption|tr)>/gi, '\n')
+      .replace(/<(?:div|section|figure|figcaption|tr)[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .split(/\n+/)
+      .map((line) => decodeHtml(line.replace(/\s+/g, ' ')).trim())
+      .filter(Boolean);
+    blocks.push(...plain);
+  }
+  return normaliseArticleBlocks(blocks);
+}
+
+function findStructuredArticle(html = '') {
+  const scripts = [...String(html).matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  const queue = [];
+  for (const script of scripts) {
+    try {
+      queue.push(JSON.parse(script[1].trim().replace(/^<!\[CDATA\[|\]\]>$/g, '')));
+    } catch {
+      // Invalid JSON-LD is common; HTML extraction below remains available.
+    }
+  }
+  while (queue.length) {
+    const value = queue.shift();
+    if (Array.isArray(value)) { queue.push(...value); continue; }
+    if (!value || typeof value !== 'object') continue;
+    if (Array.isArray(value['@graph'])) queue.push(...value['@graph']);
+    const type = Array.isArray(value['@type']) ? value['@type'].join(' ') : String(value['@type'] || '');
+    if (/article|blogposting|newsarticle/i.test(type) || value.articleBody) {
+      const image = Array.isArray(value.image) ? value.image[0] : value.image;
+      return {
+        title: value.headline || value.name || '',
+        description: value.description || '',
+        content: value.articleBody || '',
+        thumbnail: typeof image === 'object' ? (image.url || image.contentUrl || '') : (image || ''),
+      };
+    }
+    Object.values(value).forEach((child) => { if (child && typeof child === 'object') queue.push(child); });
+  }
+  return {};
+}
+
+function extractArticleContentRich(html = '') {
+  const cleanHtml = String(html)
+    .replace(/<script(?![^>]+application\/ld\+json)[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<header[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<aside[\s\S]*?<\/aside>/gi, '');
+  const candidates = [
+    /<article[^>]*>([\s\S]*?)<\/article>/i,
+    /<main[^>]*>([\s\S]*?)<\/main>/i,
+    /<(?:div|section)[^>]+(?:id|class)=["'][^"']*(?:js_content|rich_media_content|article[-_ ]?content|post[-_ ]?content|entry[-_ ]?content|article[-_ ]?body|content[-_ ]?body)[^"']*["'][^>]*>([\s\S]*?)<\/(?:div|section)>/i,
+    /<body[^>]*>([\s\S]*?)<\/body>/i,
+  ];
+  return articleHtmlToBlocks(pickRaw(cleanHtml, candidates) || cleanHtml).join('\n\n');
+}
+
 function pickRaw(html, patterns) {
   for (const pattern of patterns) {
     const match = html.match(pattern);
@@ -209,6 +298,7 @@ async function extractFromUrl(inputUrl, options = {}) {
 
   const html = await fetchHtml(pageUrl);
   const sourceUrl = pageUrl;
+  const structuredArticle = findStructuredArticle(html);
   const isBilibili = isBilibiliUrl(inputUrl) || isBilibiliUrl(pageUrl);
   const bilibiliMeta = isBilibili ? await fetchBilibiliMeta(inputUrl, html).catch((err) => {
     console.warn('Bilibili API fallback failed:', err.message);
@@ -240,7 +330,9 @@ async function extractFromUrl(inputUrl, options = {}) {
   const forceType = ['video', 'article'].includes(options.type) ? options.type : '';
   const resolvedType = forceType || ((videoUrl || isBilibili) ? 'video' : 'article');
   const resolvedVideoUrl = resolvedType === 'video' && !isBilibili ? videoUrl : '';
-  const articleContent = resolvedType === 'article' ? extractArticleContent(html) : '';
+  const articleContent = resolvedType === 'article'
+    ? (String(options.content || '').trim() || structuredArticle.content || extractArticleContentRich(html) || extractArticleContent(html))
+    : '';
 
   return {
     title: bilibiliMeta?.title || title || '未命名作品',
@@ -252,6 +344,13 @@ async function extractFromUrl(inputUrl, options = {}) {
     tags: isBilibili ? Array.from(new Set(['B站', ...(bilibiliMeta?.tags || []), ...tags])) : tags,
     source_url: inputUrl.trim(),
     external_url: sourceUrl,
+    // Keep imported articles fully inside this site. Structured data wins when a page provides it.
+    ...(resolvedType === 'article' ? {
+      title: structuredArticle.title || title || '未命名文章',
+      description: structuredArticle.description || description || '',
+      thumbnail: thumbnail || normalizeMediaUrl(structuredArticle.thumbnail || '', sourceUrl),
+      content: articleContent || structuredArticle.description || description || '',
+    } : {}),
   };
 }
 
@@ -437,13 +536,13 @@ router.post('/import-url', authMiddleware, upload.fields([
   { name: 'cover', maxCount: 1 },
 ]), async (req, res) => {
   try {
-    const { url, type } = req.body || {};
+    const { url, type, content } = req.body || {};
     if (!url) return res.status(400).json({ error: '请输入网页链接' });
     if (type === 'article' && !req.files?.cover?.[0]) {
       return res.status(400).json({ error: '文章链接需要上传封面' });
     }
 
-    const data = await extractFromUrl(url, { type });
+    const data = await extractFromUrl(url, { type, content });
     if (req.files?.cover?.[0]) {
       const f = req.files.cover[0];
       data.thumbnail = await uploadToStorage(f.path, 'articles', f.filename);

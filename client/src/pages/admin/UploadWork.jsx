@@ -66,6 +66,7 @@ function UrlImportCard({ onImported }) {
   const [url, setUrl] = useState('');
   const [importType, setImportType] = useState('auto');
   const [cover, setCover] = useState(null);
+  const [articleContent, setArticleContent] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -86,6 +87,7 @@ function UrlImportCard({ onImported }) {
       formData.append('url', url.trim());
       if (importType !== 'auto') formData.append('type', importType);
       if (cover) formData.append('cover', cover);
+      if (articleContent.trim()) formData.append('content', articleContent.trim());
 
       const res = await fetch('/api/works/import-url', {
         method: 'POST',
@@ -99,6 +101,7 @@ function UrlImportCard({ onImported }) {
       setUrl('');
       setImportType('auto');
       setCover(null);
+      setArticleContent('');
       setMessage(`导入成功：${data.work?.title || '新作品'}`);
       onImported?.(data.work);
     } catch (err) {
@@ -136,6 +139,19 @@ function UrlImportCard({ onImported }) {
             className="mt-4 w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             placeholder={importType === 'article' ? 'https://example.com/article.html' : 'https://pconline.pcvideo.com.cn/video-37670.html'}
           />
+          {importType === 'article' && (
+            <div className="mt-4 rounded-lg border border-blue-100 bg-white/80 p-4">
+              <label className="block text-sm font-semibold text-gray-800">文章正文补充（可选）</label>
+              <p className="mt-1 text-xs text-gray-500">系统会先自动提取全文。若原网页限制读取、只导入了摘要，可把正文粘贴在这里；标题用“## ”开头会显示为小标题。</p>
+              <textarea
+                value={articleContent}
+                onChange={(event) => setArticleContent(event.target.value)}
+                rows={7}
+                className="mt-3 w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm leading-relaxed text-gray-800 outline-none placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                placeholder={'例如：\n## 第一部分\n这里粘贴文章正文…'}
+              />
+            </div>
+          )}
           <div className="mt-4 rounded-lg border border-dashed border-blue-200 bg-white/70 p-4">
             <label className="block text-sm font-semibold text-gray-800">手动封面（可选）</label>
             <p className="mt-1 text-xs text-gray-500">视频可选，文章链接必填。封面会显示在作品卡片和详情页。</p>
