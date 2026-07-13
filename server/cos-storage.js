@@ -32,23 +32,43 @@ function uploadFile(filePath, folder) {
     const fileName = path.basename(filePath);
     const key = `${folder}/${fileName}`;
     const stat = fs.statSync(filePath);
-    const body = fs.readFileSync(filePath);
+    // Stream files from disk instead of loading the whole upload into RAM.
+    // Railway's small containers can otherwise be killed when a video is sent
+    // to COS, even though Multer itself wrote the upload to disk safely.
+    const fileStream = fs.createReadStream(filePath);
     const auth = sign('PUT', key);
+    let settled = false;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    const succeed = (url) => {
+      if (settled) return;
+      settled = true;
+      resolve(url);
+    };
 
     const req = https.request({
       hostname: HOST, path: `/${key}`, method: 'PUT',
       headers: { 'Authorization': auth, 'Content-Type': 'application/octet-stream', 'Content-Length': stat.size },
       timeout: 120000,
     }, (res) => {
+      res.on('error', fail);
       if (res.statusCode === 200) {
-        resolve(`https://${HOST}/${key}`);
+        // Drain the response before resolving so the connection can be reused.
+        res.resume();
+        res.on('end', () => succeed(`https://${HOST}/${key}`));
       } else {
-        let d = ''; res.on('data', c => d += c); res.on('end', () => reject(new Error(`COS ${res.statusCode}: ${d.substring(0, 100)}`)));
+        let d = '';
+        res.on('data', c => d += c);
+        res.on('end', () => fail(new Error(`COS ${res.statusCode}: ${d.substring(0, 100)}`)));
       }
     });
-    req.on('error', reject);
-    req.setTimeout(120000, () => { req.destroy(); reject(new Error('Upload timeout')); });
-    req.write(body); req.end();
+    req.on('error', fail);
+    req.setTimeout(120000, () => req.destroy(new Error('Upload timeout')));
+    fileStream.on('error', (err) => req.destroy(err));
+    fileStream.pipe(req);
   });
 }
 

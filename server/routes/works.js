@@ -516,7 +516,17 @@ router.get('/proxy-video', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
 
     if (!upstream.body) return res.end();
-    Readable.fromWeb(upstream.body).pipe(res);
+    const upstreamStream = Readable.fromWeb(upstream.body);
+    // A remote site can reset its response midway through playback. Without an
+    // error listener Node treats that as an uncaught stream error and restarts
+    // the whole Railway service, which also aborts unrelated uploads.
+    upstreamStream.on('error', (err) => {
+      console.error('Proxy video stream error:', err.message);
+      if (!res.headersSent) res.status(502).send('Video source disconnected');
+      else res.destroy(err);
+    });
+    res.on('close', () => upstreamStream.destroy());
+    upstreamStream.pipe(res);
   } catch (err) {
     console.error('Proxy video error:', err);
     res.status(500).send('Video proxy failed');
@@ -557,7 +567,16 @@ router.get('/proxy-image', async (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=86400');
 
     if (!upstream.body) return res.end();
-    Readable.fromWeb(upstream.body).pipe(res);
+    const upstreamStream = Readable.fromWeb(upstream.body);
+    // See the video proxy above: third-party images may close connections at
+    // any time, so make the failure request-scoped instead of process-wide.
+    upstreamStream.on('error', (err) => {
+      console.error('Proxy image stream error:', err.message);
+      if (!res.headersSent) res.status(502).send('Image source disconnected');
+      else res.destroy(err);
+    });
+    res.on('close', () => upstreamStream.destroy());
+    upstreamStream.pipe(res);
   } catch (err) {
     console.error('Proxy image error:', err);
     res.status(500).send('Image proxy failed');
