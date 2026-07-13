@@ -65,6 +65,10 @@ function pickAll(html, pattern) {
   return [...html.matchAll(pattern)].map(m => decodeHtml(m[1])).filter(Boolean);
 }
 
+function isBilibiliUrl(url = '') {
+  return /(^|\.)bilibili\.com|b23\.tv/i.test(url);
+}
+
 async function fetchHtml(url) {
   const response = await fetch(url, {
     headers: {
@@ -92,6 +96,7 @@ async function extractFromUrl(inputUrl) {
 
   const html = await fetchHtml(pageUrl);
   const sourceUrl = pageUrl;
+  const isBilibili = isBilibiliUrl(inputUrl) || isBilibiliUrl(pageUrl);
   const title = pick(html, [
     /<p[^>]+class=["'][^"']*\btit\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i,
     /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
@@ -116,11 +121,11 @@ async function extractFromUrl(inputUrl) {
   return {
     title: title || '未命名作品',
     description,
-    type: videoUrl ? 'video' : 'article',
-    file_path: videoUrl,
+    type: (videoUrl || isBilibili) ? 'video' : 'article',
+    file_path: isBilibili ? '' : videoUrl,
     thumbnail,
-    content: videoUrl ? '' : description,
-    tags,
+    content: (videoUrl || isBilibili) ? '' : description,
+    tags: isBilibili ? Array.from(new Set(['B站', ...tags])) : tags,
     source_url: inputUrl.trim(),
     external_url: sourceUrl,
   };

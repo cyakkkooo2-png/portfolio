@@ -32,6 +32,7 @@ export default function WorkDetailModal({ work, onClose }) {
   const [videoError, setVideoError] = useState(false);
   const isExternalVideo = work?.type === 'video' && /^https?:\/\//i.test(work?.file_path || '');
   const originalUrl = work?.external_url || work?.source_url || work?.file_path;
+  const isLinkOnlyVideo = work?.type === 'video' && !work?.file_path && !!originalUrl;
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -82,7 +83,27 @@ export default function WorkDetailModal({ work, onClose }) {
             maxHeight: '62vh',
           }}
         >
-          {work.type === 'video' ? (
+          {work.type === 'video' && isLinkOnlyVideo ? (
+            <div className="relative h-full w-full">
+              {work.thumbnail ? (
+                <img src={assetUrl(work.thumbnail)} alt={work.title} className="h-full w-full object-cover" />
+              ) : (
+                <div className="h-full w-full" style={{ background: 'linear-gradient(135deg, #141420, #080810)' }} />
+              )}
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.74))' }}>
+                <div className="flex h-16 w-16 items-center justify-center rounded-full text-white" style={{ background: acc, boxShadow: `0 18px 45px ${acc}50` }}>
+                  <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10-6.5-10-6.5Z" /></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">B站视频</p>
+                  <p className="mt-1 text-xs text-white/60">该视频需要跳转到 B站 原网页播放。</p>
+                </div>
+                <button type="button" onClick={() => openCurrentTab(originalUrl)} className="rounded-full px-5 py-2 text-sm font-semibold text-white" style={{ background: acc }}>
+                  打开 B站播放
+                </button>
+              </div>
+            </div>
+          ) : work.type === 'video' ? (
             <div className="relative h-full w-full">
               <video
                 src={videoUrl(work.file_path)}
