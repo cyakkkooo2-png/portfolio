@@ -35,6 +35,7 @@ export default function WorkDetailModal({ work, onClose }) {
   const isExternalVideo = work?.type === 'video' && /^https?:\/\//i.test(work?.file_path || '');
   const originalUrl = work?.external_url || work?.source_url || work?.file_path;
   const isLinkOnlyVideo = work?.type === 'video' && !work?.file_path && !!originalUrl;
+  const isExternalArticle = work?.type === 'article' && !!(work?.external_url || work?.source_url);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -156,7 +157,36 @@ export default function WorkDetailModal({ work, onClose }) {
           </h2>
           {work.description && <p className="mb-5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }}>{work.description}</p>}
 
-          {(work.external_url || work.source_url) && !isExternalVideo && (
+          {work.type === 'article' && work.content && (
+            <div className="mt-4 space-y-3 pt-5 leading-relaxed" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }}>
+              {work.content.split('\n\n').map((block, index) => <p key={index}>{block}</p>)}
+            </div>
+          )}
+
+          {isExternalArticle && (
+            <div className="mt-6 overflow-hidden rounded-2xl" style={{ border: '1px solid rgba(255,255,255,0.08)', background: '#fff' }}>
+              <div className="flex items-center justify-between gap-3 border-b border-black/10 bg-white px-4 py-3">
+                <span className="text-xs font-semibold text-gray-500">站内浏览文章</span>
+                <button
+                  type="button"
+                  onClick={() => openCurrentTab(work.external_url || work.source_url)}
+                  className="rounded-full px-3 py-1.5 text-xs font-semibold text-white"
+                  style={{ background: acc }}
+                >
+                  打开原网页
+                </button>
+              </div>
+              <iframe
+                src={work.external_url || work.source_url}
+                title={work.title}
+                className="h-[68vh] w-full bg-white"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+          )}
+
+          {(work.external_url || work.source_url) && !isExternalVideo && !isExternalArticle && (
             <button
               type="button"
               onClick={() => openCurrentTab(work.external_url || work.source_url)}
@@ -165,12 +195,6 @@ export default function WorkDetailModal({ work, onClose }) {
             >
               打开原网页
             </button>
-          )}
-
-          {work.type === 'article' && work.content && (
-            <div className="mt-4 space-y-3 pt-5 leading-relaxed" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }}>
-              {work.content.split('\n\n').map((block, index) => <p key={index}>{block}</p>)}
-            </div>
           )}
 
           {work.tags?.length > 0 && (

@@ -74,6 +74,10 @@ function UrlImportCard({ onImported }) {
       setMessage('请先粘贴网页链接');
       return;
     }
+    if (importType === 'article' && !cover) {
+      setMessage('文章链接需要上传封面');
+      return;
+    }
 
     setBusy(true);
     setMessage('');
