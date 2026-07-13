@@ -17,6 +17,16 @@ function videoUrl(url) {
   return url;
 }
 
+function documentUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('/uploads/')) return `https://portfolio-production-913f.up.railway.app${url}`;
+  return url;
+}
+
+function isArticleHtml(content = '') {
+  return /<(?:h[1-4]|p|ul|ol|li|blockquote|figure|img)\b/i.test(content);
+}
+
 function openCurrentTab(url) {
   if (url) window.location.href = url;
 }
@@ -177,8 +187,25 @@ export default function WorkDetailModal({ work, onClose }) {
 
           {work.type === 'article' && work.content && (
             <div className="mt-4 space-y-4 pt-5 leading-relaxed" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.62)', lineHeight: 1.9 }}>
-              {work.content.split('\n\n').map(renderArticleBlock)}
+              {isArticleHtml(work.content) ? (
+                <article
+                  className="article-body space-y-4 [&_a]:text-orange-300 [&_a]:underline [&_blockquote]:my-6 [&_blockquote]:border-l-4 [&_blockquote]:border-orange-500 [&_blockquote]:pl-4 [&_blockquote]:italic [&_figcaption]:mt-2 [&_figcaption]:text-center [&_figcaption]:text-sm [&_figcaption]:text-white/45 [&_figure]:my-7 [&_h1]:mt-8 [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:text-white [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-white [&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-white/90 [&_img]:my-5 [&_img]:max-h-[620px] [&_img]:w-full [&_img]:rounded-xl [&_img]:object-contain [&_li]:ml-5 [&_li]:list-disc [&_ol]:my-5 [&_ol]:space-y-2 [&_p]:mb-5 [&_ul]:my-5 [&_ul]:space-y-2"
+                  dangerouslySetInnerHTML={{ __html: work.content }}
+                />
+              ) : work.content.split('\n\n').map(renderArticleBlock)}
             </div>
+          )}
+
+          {work.type === 'article' && work.file_path && (
+            <a
+              href={documentUrl(work.file_path)}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-6 inline-flex items-center rounded-full px-5 py-2.5 text-sm font-bold text-white no-underline transition hover:opacity-90"
+              style={{ background: acc }}
+            >
+              查看文档
+            </a>
           )}
 
           {(work.external_url || work.source_url) && !isExternalVideo && work.type !== 'article' && (

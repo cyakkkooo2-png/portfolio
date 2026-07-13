@@ -190,8 +190,7 @@ export default function UploadWork() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!title.trim()) return setError('请输入标题');
-    if (type !== 'article' && !file) return setError('请选择文件');
-    if (type === 'article' && !content.trim()) return setError('请输入文章内容');
+    if (!file) return setError('请选择文件');
 
     setUploading(true);
     setError('');
@@ -207,7 +206,7 @@ export default function UploadWork() {
       formData.append('type', type);
       formData.append('content', content);
       formData.append('tags', JSON.stringify(tags.split(',').map((tag) => tag.trim()).filter(Boolean)));
-      if (file) formData.append(type === 'video' ? 'video' : 'image', file);
+      if (file) formData.append(type === 'video' ? 'video' : type === 'image' ? 'image' : 'document', file);
       if (cover) formData.append('cover', cover);
 
       await uploadWorkWithProgress(formData, {
@@ -311,10 +310,11 @@ export default function UploadWork() {
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className={inputClass} placeholder="简短描述..." />
             </div>
 
-            {type !== 'article' && (
+            {type && (
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">{type === 'video' ? '视频文件 *' : '图片文件 *'}</label>
-                <input type="file" accept={type === 'video' ? 'video/*' : 'image/*'} onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
+                <label className="mb-2 block text-sm font-medium text-gray-700">{type === 'video' ? '视频文件 *' : type === 'image' ? '图片文件 *' : '文章文档 *'}</label>
+                <p className="mb-2 text-xs text-gray-500">{type === 'article' ? '支持 PDF、Word、TXT 或 Markdown 文档；正文会作为文档保存在作品中。' : ''}</p>
+                <input type="file" accept={type === 'video' ? 'video/*' : type === 'image' ? 'image/*' : '.pdf,.doc,.docx,.txt,.md'} onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
                 {file && <p className="mt-1 text-xs text-gray-500">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
               </div>
             )}
@@ -324,12 +324,6 @@ export default function UploadWork() {
               <input type="file" accept="image/*" onChange={(e) => setCover(e.target.files?.[0] || null)} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
             </div>
 
-            {type === 'article' && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">文章内容 *</label>
-                <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} className={`${inputClass} font-mono`} placeholder={'## 标题\n\n正文...'} required />
-              </div>
-            )}
 
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">标签（逗号分隔）</label>

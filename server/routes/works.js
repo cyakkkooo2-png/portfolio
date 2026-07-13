@@ -14,7 +14,7 @@ const TMP_DIR = path.join(__dirname, '..', 'tmp');
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 
 if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
-['images', 'videos', 'articles'].forEach(s => {
+['images', 'videos', 'articles', 'documents'].forEach(s => {
   const p = path.join(UPLOADS_DIR, s);
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 });
@@ -36,6 +36,7 @@ const upload = multer({
       video: /\.(mp4|webm|mov|avi|mkv)$/i,
       thumbnail: /\.(jpg|jpeg|png|gif|webp)$/i,
       cover: /\.(jpg|jpeg|png|gif|webp)$/i,
+      document: /\.(pdf|doc|docx|txt|md)$/i,
     };
     const pattern = allowed[file.fieldname];
     cb(pattern?.test(path.extname(file.originalname)) ? null : new Error('不支持的文件格式'), pattern?.test(path.extname(file.originalname)));
@@ -180,6 +181,81 @@ function findStructuredArticle(html = '') {
     Object.values(value).forEach((child) => { if (child && typeof child === 'object') queue.push(child); });
   }
   return {};
+}
+
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
+
+function getElementInner(html, openingMatch, tag) {
+  const start = openingMatch.index + openingMatch[0].length;
+  const token = new RegExp(`<\\/?${tag}\\b[^>]*>`, 'gi');
+  token.lastIndex = start;
+  let depth = 1;
+  let match;
+  while ((match = token.exec(html))) {
+    if (/^<\//.test(match[0])) depth -= 1;
+    else if (!/\/>$/.test(match[0])) depth += 1;
+    if (depth === 0) return html.slice(start, match.index);
+  }
+  return html.slice(start);
+}
+
+function findArticleRoot(html = '') {
+  const source = String(html);
+  const targeted = /<(div|section)\b[^>]*(?:id|class)=["'][^"']*(?:js_content|rich_media_content|article[-_ ]?content|post[-_ ]?content|entry[-_ ]?content|article[-_ ]?body|content[-_ ]?body|article-detail)[^"']*["'][^>]*>/gi;
+  const semantic = /<(article|main)\b[^>]*>/gi;
+  for (const pattern of [targeted, semantic]) {
+    let match;
+    while ((match = pattern.exec(source))) {
+      const inner = getElementInner(source, match, match[1]);
+      if (stripHtml(inner).length >= 100) return inner;
+    }
+  }
+  const body = /<body\b[^>]*>([\s\S]*?)<\/body>/i.exec(source)?.[1] || source;
+  return body;
+}
+
+function safeArticleHtml(fragment = '', baseUrl = '') {
+  const stripped = String(fragment)
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<(?:nav|header|footer|aside)[\s\S]*?<\/(?:nav|header|footer|aside)>/gi, '')
+    .replace(/<(?:div|section)[^>]+(?:id|class)=["'][^"']*(?:comment|recommend|related|advert|share|toolbar|sidebar)[^"']*["'][^>]*>[\s\S]*?<\/(?:div|section)>/gi, '');
+  const allowed = new Set(['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'blockquote', 'strong', 'b', 'em', 'i', 'u', 'a', 'br', 'figure', 'figcaption', 'img']);
+  return stripped.replace(/<\/?([a-z0-9]+)\b[^>]*>/gi, (raw, name) => {
+    const tag = name.toLowerCase();
+    if (!allowed.has(tag)) return '';
+    if (/^<\//.test(raw)) return `</${tag}>`;
+    if (tag === 'img') {
+      const srcMatch = raw.match(/(?:src|data-src|data-original)=["']([^"']+)["']/i);
+      const src = normalizeMediaUrl(srcMatch?.[1] || '', baseUrl);
+      if (!/^https?:\/\//i.test(src)) return '';
+      const alt = decodeHtml(raw.match(/alt=["']([^"']*)["']/i)?.[1] || '文章配图');
+      return `<img src="/api/works/proxy-image?url=${encodeURIComponent(src)}" alt="${escapeHtml(alt)}" loading="lazy">`;
+    }
+    if (tag === 'a') {
+      const href = normalizeMediaUrl(raw.match(/href=["']([^"']+)["']/i)?.[1] || '', baseUrl);
+      return /^https?:\/\//i.test(href) ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">` : '<a>';
+    }
+    return tag === 'br' ? '<br>' : `<${tag}>`;
+  }).replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function articleTextToHtml(text = '') {
+  return String(text).split(/\n{2,}/).map((block) => {
+    const value = escapeHtml(block.trim());
+    if (!value) return '';
+    if (/^#{2,4}\s/.test(value)) return `<h2>${value.replace(/^#{2,4}\s/, '')}</h2>`;
+    return `<p>${value.replace(/\n/g, '<br>')}</p>`;
+  }).join('');
+}
+
+function extractArticleHtml(html = '', baseUrl = '') {
+  const content = safeArticleHtml(findArticleRoot(html), baseUrl);
+  return stripHtml(content).length >= 100 ? content : '';
 }
 
 function extractArticleContentRich(html = '') {
@@ -330,8 +406,10 @@ async function extractFromUrl(inputUrl, options = {}) {
   const forceType = ['video', 'article'].includes(options.type) ? options.type : '';
   const resolvedType = forceType || ((videoUrl || isBilibili) ? 'video' : 'article');
   const resolvedVideoUrl = resolvedType === 'video' && !isBilibili ? videoUrl : '';
+  const articleHtml = resolvedType === 'article' ? extractArticleHtml(html, sourceUrl) : '';
+  const manualArticleContent = String(options.content || '').trim();
   const articleContent = resolvedType === 'article'
-    ? (String(options.content || '').trim() || structuredArticle.content || extractArticleContentRich(html) || extractArticleContent(html))
+    ? (manualArticleContent ? articleTextToHtml(manualArticleContent) : articleHtml || articleTextToHtml(structuredArticle.content) || extractArticleContentRich(html) || extractArticleContent(html))
     : '';
 
   return {
@@ -449,7 +527,11 @@ router.get('/proxy-image', async (req, res) => {
     const url = normalizeMediaUrl(String(req.query.url || ''));
     if (!/^https?:\/\//i.test(url)) return res.status(400).send('Invalid image URL');
 
-    const allowed = db.getWorks().some((work) => normalizeMediaUrl(work.thumbnail) === url || normalizeMediaUrl(work.file_path) === url);
+    const allowed = db.getWorks().some((work) => (
+      normalizeMediaUrl(work.thumbnail) === url
+      || normalizeMediaUrl(work.file_path) === url
+      || String(work.content || '').includes(encodeURIComponent(url))
+    ));
     if (!allowed) return res.status(403).send('Image URL is not in works');
 
     const upstream = await fetch(url, {
@@ -488,7 +570,7 @@ router.get('/:id', (req, res) => {
 
 // POST /api/works
 router.post('/', authMiddleware, upload.fields([
-  { name: 'image', maxCount: 1 }, { name: 'video', maxCount: 1 }, { name: 'cover', maxCount: 1 },
+  { name: 'image', maxCount: 1 }, { name: 'video', maxCount: 1 }, { name: 'document', maxCount: 1 }, { name: 'cover', maxCount: 1 },
 ]), async (req, res) => {
   try {
     const { title, description, type, content, tags } = req.body;
@@ -505,6 +587,10 @@ router.post('/', authMiddleware, upload.fields([
       } else if (type === 'image' && req.files.image) {
         const f = req.files.image[0];
         filePath = await uploadToStorage(f.path, 'images', f.filename);
+        totalFileSize += f.size || 0;
+      } else if (type === 'article' && req.files.document) {
+        const f = req.files.document[0];
+        filePath = await uploadToStorage(f.path, 'documents', f.filename);
         totalFileSize += f.size || 0;
       }
       if (req.files.cover) {
@@ -558,7 +644,7 @@ router.post('/import-url', authMiddleware, upload.fields([
 
 // PUT /api/works/:id
 router.put('/:id', authMiddleware, upload.fields([
-  { name: 'image', maxCount: 1 }, { name: 'video', maxCount: 1 }, { name: 'cover', maxCount: 1 },
+  { name: 'image', maxCount: 1 }, { name: 'video', maxCount: 1 }, { name: 'document', maxCount: 1 }, { name: 'cover', maxCount: 1 },
 ]), async (req, res) => {
   try {
     const existing = db.getWorkById(req.params.id);
@@ -584,6 +670,12 @@ router.put('/:id', authMiddleware, upload.fields([
         await deleteFromStorage(existing.file_path);
         const f = req.files.image[0];
         updateData.file_path = await uploadToStorage(f.path, 'images', f.filename);
+        totalFileSize = f.size || 0;
+      }
+      if (req.files.document) {
+        await deleteFromStorage(existing.file_path);
+        const f = req.files.document[0];
+        updateData.file_path = await uploadToStorage(f.path, 'documents', f.filename);
         totalFileSize = f.size || 0;
       }
       if (req.files.cover) {
