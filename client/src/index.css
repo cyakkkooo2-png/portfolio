@@ -20,6 +20,7 @@ body {
 @keyframes pulseDot { 0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); } 50% { opacity: 0.5; transform: translateX(-50%) scale(1.4); } }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes floatUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes drift { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(0, -12px, 0); } }
 
 .animate-in { animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-in-delay-1 { animation-delay: 0.1s; opacity: 0; }
@@ -46,6 +47,41 @@ body {
   opacity: 1;
   transform: translateY(0);
 }
+
+.section-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #ff6600;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.section-kicker::before,
+.section-kicker::after {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: currentColor;
+  opacity: .65;
+}
+
+.section-heading-mark {
+  width: 46px;
+  height: 4px;
+  margin: 18px auto 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff6600 0%, #ff9d57 52%, #6d67d8 52%, #6d67d8 100%);
+}
+
+.soft-dots {
+  background-image: radial-gradient(rgba(17, 24, 39, 0.12) 1px, transparent 1px);
+  background-size: 15px 15px;
+}
+
+.floating-orb { animation: drift 6s ease-in-out infinite; }
 
 /* Admin dark theme scrollbar */
 .admin-scroll::-webkit-scrollbar { width: 5px; }

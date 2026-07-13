@@ -94,12 +94,16 @@ export default function WorksGrid({ onSelectWork }) {
   }, [filter]);
 
   return (
-    <section id="work" className="relative px-6 py-24 md:px-20" style={{ background: '#fff' }}>
+    <section id="work" className="relative overflow-hidden px-6 py-24 md:px-20" style={{ background: '#fff' }}>
+      <div className="pointer-events-none absolute -left-20 top-32 h-52 w-52 rounded-full" style={{ background: 'radial-gradient(circle, rgba(109,103,216,0.09), transparent 68%)' }} />
+      <div className="soft-dots pointer-events-none absolute right-10 top-20 hidden h-24 w-24 opacity-35 md:block" />
       <div className="mx-auto max-w-6xl">
         <div className="text-center">
+          <span className="section-kicker">Creative archive</span>
           <h2 className="text-gray-900" style={{ fontFamily: "'Playfair Display', 'Noto Serif SC', serif", fontSize: 'clamp(42px, 4vw, 58px)', fontWeight: 900, lineHeight: 1.1 }}>
             <SplitTitle value={t?.worksTitle} fallback="精选作品" />
           </h2>
+          <div className="section-heading-mark" />
           <RichText as="p" value={t?.worksSubtitle} fallback="Selected works across video, image and writing" className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }} />
         </div>
 

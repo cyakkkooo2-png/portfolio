@@ -12,17 +12,20 @@ export default function About() {
   const image = t?.aboutImage || '';
 
   return (
-    <section id="about" className="relative px-6 py-24 md:px-20" style={{ background: '#f3f3f3' }}>
+    <section id="about" className="relative overflow-hidden px-6 py-24 md:px-20" style={{ background: '#f3f3f3' }}>
+      <div className="pointer-events-none absolute -right-20 bottom-12 h-72 w-72 rounded-full" style={{ background: 'radial-gradient(circle, rgba(255,102,0,0.1), transparent 68%)' }} />
       <div className="mx-auto max-w-6xl">
         <div className="mb-16 text-center">
+          <span className="section-kicker" style={{ color: '#6d67d8' }}>Profile / 01</span>
           <h2 className="text-gray-900" style={{ fontFamily: "'Playfair Display', 'Noto Serif SC', serif", fontSize: 'clamp(42px, 4vw, 56px)', fontWeight: 900, lineHeight: 1.1 }}>
             <SplitTitle value={t?.aboutTitle} fallback="关于我" />
           </h2>
+          <div className="section-heading-mark" />
           <p className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }}>About Me</p>
         </div>
 
         <div className="grid items-center gap-14 md:grid-cols-[215px_1fr]">
-          <div className="mx-auto w-full max-w-[215px] overflow-hidden rounded-2xl bg-white shadow-sm" style={{ aspectRatio: '4/5' }}>
+          <div className="relative mx-auto w-full max-w-[215px] overflow-hidden rounded-2xl bg-white shadow-sm ring-4 ring-white" style={{ aspectRatio: '4/5', boxShadow: '12px 14px 0 rgba(109,103,216,0.22), 0 18px 34px rgba(17,24,39,0.12)' }}>
             {image ? (
               <img src={image} alt="关于我" className="h-full w-full object-cover" />
             ) : (

@@ -22,6 +22,11 @@ export default function Hero() {
   return (
     <section id="hero" className="relative flex min-h-screen items-center justify-center overflow-hidden px-6" style={{ background: 'radial-gradient(circle at 8% 18%, #25215d 0%, #1d1948 32%, #19163d 60%, #33204f 100%)' }}>
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.02), transparent 28%, rgba(255,255,255,0.02))' }} />
+      <div className="absolute -left-24 top-24 h-64 w-64 rounded-full border border-white/10" />
+      <div className="floating-orb absolute -right-20 top-40 h-72 w-72 rounded-full border border-white/10" style={{ boxShadow: 'inset 0 0 70px rgba(255, 132, 62, 0.05)' }} />
+      <div className="absolute left-[10%] top-[28%] h-2 w-2 rounded-full" style={{ background: acc, boxShadow: `0 0 0 8px ${acc}22` }} />
+      <div className="absolute right-[14%] top-[31%] h-2 w-2 rounded-full bg-white/70" />
+      <div className="absolute bottom-20 left-[16%] hidden h-20 w-20 rotate-12 border border-white/10 md:block" />
 
       <div className="relative z-10 mx-auto max-w-4xl text-center" style={{ marginTop: 70 }}>
         <RichText
@@ -46,6 +51,12 @@ export default function Hero() {
           className="mx-auto mt-6 max-w-3xl text-lg font-medium leading-relaxed"
           style={{ color: 'rgba(255,255,255,0.56)' }}
         />
+
+        <div className="mx-auto mt-5 flex max-w-md items-center justify-center gap-3" aria-hidden="true">
+          <span className="h-px flex-1 bg-white/10" />
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: acc }} />
+          <span className="h-px flex-1 bg-white/10" />
+        </div>
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <button onClick={() => to('work')} className="rounded-full px-9 py-3 text-sm font-bold text-white transition-transform hover:scale-105" style={{ background: acc, boxShadow: `0 14px 35px ${acc}33` }}>
