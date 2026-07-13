@@ -64,6 +64,7 @@ function UtilityUploadCard({ title, description, accept, fieldName, endpoint, bu
 
 function UrlImportCard({ onImported }) {
   const [url, setUrl] = useState('');
+  const [cover, setCover] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -76,17 +77,21 @@ function UrlImportCard({ onImported }) {
     setBusy(true);
     setMessage('');
     try {
+      const formData = new FormData();
+      formData.append('url', url.trim());
+      if (cover) formData.append('cover', cover);
+
       const res = await fetch('/api/works/import-url', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify({ url: url.trim() }),
+        body: formData,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '导入失败');
       setUrl('');
+      setCover(null);
       setMessage(`导入成功：${data.work?.title || '新作品'}`);
       onImported?.(data.work);
     } catch (err) {
@@ -108,6 +113,17 @@ function UrlImportCard({ onImported }) {
             className="mt-4 w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             placeholder="https://pconline.pcvideo.com.cn/video-37670.html"
           />
+          <div className="mt-4 rounded-lg border border-dashed border-blue-200 bg-white/70 p-4">
+            <label className="block text-sm font-semibold text-gray-800">手动封面（可选）</label>
+            <p className="mt-1 text-xs text-gray-500">复制自己频道的视频时，建议直接上传一张清晰封面；不传则继续自动尝试抓取。</p>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setCover(e.target.files?.[0] || null)}
+              className="mt-3 w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-orange-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-orange-700 hover:file:bg-orange-100"
+            />
+            {cover && <p className="mt-2 text-xs text-gray-500">{cover.name} ({(cover.size / 1024 / 1024).toFixed(1)} MB)</p>}
+          </div>
         </div>
         <button type="button" disabled={busy} onClick={importUrl} className="rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
           {busy ? '导入中...' : '导入链接'}

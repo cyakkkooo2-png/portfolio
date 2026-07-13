@@ -375,12 +375,19 @@ router.post('/', authMiddleware, upload.fields([
 });
 
 // POST /api/works/import-url
-router.post('/import-url', authMiddleware, async (req, res) => {
+router.post('/import-url', authMiddleware, upload.fields([
+  { name: 'cover', maxCount: 1 },
+]), async (req, res) => {
   try {
     const { url } = req.body || {};
     if (!url) return res.status(400).json({ error: '请输入网页链接' });
 
     const data = await extractFromUrl(url);
+    if (req.files?.cover?.[0]) {
+      const f = req.files.cover[0];
+      data.thumbnail = await uploadToStorage(f.path, 'articles', f.filename);
+      if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
+    }
     const work = db.createWork(data);
     res.status(201).json({ work, extracted: data });
   } catch (err) {
