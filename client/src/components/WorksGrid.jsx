@@ -12,6 +12,13 @@ const FILTERS = [
 const LABELS = { video: '视频', image: '图片', article: '文章' };
 const ICONS = { video: 'video', image: 'image', article: 'article' };
 
+function assetUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('//')) return `/api/works/proxy-image?url=${encodeURIComponent(`https:${url}`)}`;
+  if (/^https?:\/\//i.test(url)) return `/api/works/proxy-image?url=${encodeURIComponent(url)}`;
+  return url;
+}
+
 function FilterIcon({ type, active, color }) {
   const stroke = active ? '#fff' : color;
   const common = {
@@ -128,7 +135,7 @@ export default function WorksGrid({ onSelectWork }) {
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               {works.map((work) => (
                 <article key={work.id} className="group relative aspect-video cursor-pointer overflow-hidden rounded-2xl transition-transform hover:-translate-y-1" style={{ background: '#0f1322', boxShadow: '0 28px 55px rgba(15,19,34,0.14)' }} onClick={() => onSelectWork?.(work)}>
-                  {work.type === 'image' && work.file_path ? <img src={work.file_path} alt={work.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" /> : work.thumbnail ? <img src={work.thumbnail} alt={work.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" /> : null}
+                  {work.type === 'image' && work.file_path ? <img src={assetUrl(work.file_path)} alt={work.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" /> : work.thumbnail ? <img src={assetUrl(work.thumbnail)} alt={work.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" /> : null}
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0.08) 0%, rgba(6,8,18,0.92) 100%)' }} />
                   <div className="absolute bottom-7 left-7 right-7">
                     <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ background: 'rgba(255,255,255,0.14)' }}>

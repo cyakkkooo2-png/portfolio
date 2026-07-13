@@ -69,6 +69,25 @@ function isBilibiliUrl(url = '') {
   return /(^|\.)bilibili\.com|b23\.tv/i.test(url);
 }
 
+function normalizeMediaUrl(url = '', baseUrl = '') {
+  let value = decodeHtml(url)
+    .replace(/\\u002[fF]/g, '/')
+    .replace(/\\\//g, '/')
+    .trim();
+
+  if (!value) return '';
+  if (value.startsWith('//')) return `https:${value}`;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith('/') && /^https?:\/\//i.test(baseUrl)) {
+    try {
+      return new URL(value, baseUrl).toString();
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
 async function fetchHtml(url) {
   const response = await fetch(url, {
     headers: {
@@ -107,11 +126,14 @@ async function extractFromUrl(inputUrl) {
     /<p[^>]+class=["'][^"']*\bdesc\b[^"']*["'][^>]*>[\s\S]*?<span[^>]*>[^<]*<\/span>([\s\S]*?)<\/p>/i,
     /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,
   ]);
-  const thumbnail = pick(html, [
+  const thumbnail = normalizeMediaUrl(pick(html, [
     /<video[^>]+poster=["']([^"']+)["']/i,
-    /"images"\s*:\s*\[\s*["']([^"']+)["']/i,
     /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-  ]);
+    /<meta[^>]+itemprop=["']image["'][^>]+content=["']([^"']+)["']/i,
+    /"pic"\s*:\s*"([^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/i,
+    /"cover"\s*:\s*"([^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/i,
+    /"images"\s*:\s*\[\s*["']([^"']+)["']/i,
+  ]), sourceUrl);
   const videoUrl = pick(html, [
     /<source[^>]+src=["']([^"']+\.mp4[^"']*)["']/i,
     /<video[^>]+src=["']([^"']+\.mp4[^"']*)["']/i,
@@ -216,6 +238,43 @@ router.get('/proxy-video', async (req, res) => {
   } catch (err) {
     console.error('Proxy video error:', err);
     res.status(500).send('Video proxy failed');
+  }
+});
+
+// GET /api/works/proxy-image?url=...
+// Some third-party thumbnails block hotlinking. Proxy only saved work images.
+router.get('/proxy-image', async (req, res) => {
+  try {
+    const url = normalizeMediaUrl(String(req.query.url || ''));
+    if (!/^https?:\/\//i.test(url)) return res.status(400).send('Invalid image URL');
+
+    const allowed = db.getWorks().some((work) => normalizeMediaUrl(work.thumbnail) === url || normalizeMediaUrl(work.file_path) === url);
+    if (!allowed) return res.status(403).send('Image URL is not in works');
+
+    const upstream = await fetch(url, {
+      headers: {
+        'User-Agent': req.get('user-agent') || 'Mozilla/5.0',
+        Accept: req.get('accept') || 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        Referer: new URL(url).origin,
+      },
+    });
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).send('Image source unavailable');
+    }
+
+    ['content-type', 'content-length', 'cache-control', 'last-modified', 'etag'].forEach((name) => {
+      const value = upstream.headers.get(name);
+      if (value) res.setHeader(name, value);
+    });
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    if (!upstream.body) return res.end();
+    Readable.fromWeb(upstream.body).pipe(res);
+  } catch (err) {
+    console.error('Proxy image error:', err);
+    res.status(500).send('Image proxy failed');
   }
 });
 
