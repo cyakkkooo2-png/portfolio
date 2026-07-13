@@ -203,7 +203,7 @@ function getElementInner(html, openingMatch, tag) {
 
 function findArticleRoot(html = '') {
   const source = String(html);
-  const targeted = /<(div|section)\b[^>]*(?:id|class)=["'][^"']*(?:js_content|rich_media_content|article[-_ ]?content|post[-_ ]?content|entry[-_ ]?content|article[-_ ]?body|content[-_ ]?body|article-detail)[^"']*["'][^>]*>/gi;
+  const targeted = /<(div|section)\b[^>]*(?:id|class)=["'][^"']*(?:context-box|js_content|rich_media_content|article[-_ ]?content|post[-_ ]?content|entry[-_ ]?content|article[-_ ]?body|content[-_ ]?body|article-detail)[^"']*["'][^>]*>/gi;
   const semantic = /<(article|main)\b[^>]*>/gi;
   for (const pattern of [targeted, semantic]) {
     let match;
@@ -230,7 +230,9 @@ function safeArticleHtml(fragment = '', baseUrl = '') {
     if (!allowed.has(tag)) return '';
     if (/^<\//.test(raw)) return `</${tag}>`;
     if (tag === 'img') {
-      const srcMatch = raw.match(/(?:src|data-src|data-original)=["']([^"']+)["']/i);
+      const srcMatch = raw.match(/#src=["']([^"']+)["']/i)
+        || raw.match(/(?:data-src|data-original)=["']([^"']+)["']/i)
+        || raw.match(/src=["']([^"']+)["']/i);
       const src = normalizeMediaUrl(srcMatch?.[1] || '', baseUrl);
       if (!/^https?:\/\//i.test(src)) return '';
       const alt = decodeHtml(raw.match(/alt=["']([^"']*)["']/i)?.[1] || '文章配图');
@@ -240,6 +242,7 @@ function safeArticleHtml(fragment = '', baseUrl = '') {
       const href = normalizeMediaUrl(raw.match(/href=["']([^"']+)["']/i)?.[1] || '', baseUrl);
       return /^https?:\/\//i.test(href) ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">` : '<a>';
     }
+    if (tag === 'p' && /text-align\s*:\s*center/i.test(raw)) return '<p class="article-align-center">';
     return tag === 'br' ? '<br>' : `<${tag}>`;
   }).replace(/\n{3,}/g, '\n\n').trim();
 }
