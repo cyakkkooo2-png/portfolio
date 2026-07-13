@@ -28,6 +28,17 @@ function TypeIcon({ type }) {
   return <svg {...common}><path d="M7.5 3.8h6.8L18 7.5v12.2a1.8 1.8 0 0 1-1.8 1.8H7.5a1.8 1.8 0 0 1-1.8-1.8V5.6a1.8 1.8 0 0 1 1.8-1.8Z" /><path d="M14 3.8V8h4" /><path d="M9 12.2h6" /><path d="M9 15.6h5" /></svg>;
 }
 
+function renderArticleBlock(block, index) {
+  const text = block.trim();
+  if (!text) return null;
+  if (text.startsWith('#### ')) return <h4 key={index} className="pt-2 text-lg font-bold text-white/85">{text.slice(5)}</h4>;
+  if (text.startsWith('### ')) return <h3 key={index} className="pt-3 text-xl font-bold text-white/90">{text.slice(4)}</h3>;
+  if (text.startsWith('## ')) return <h2 key={index} className="pt-4 text-2xl font-bold text-white">{text.slice(3)}</h2>;
+  if (text.startsWith('• ')) return <p key={index} className="pl-4">• {text.slice(2)}</p>;
+  if (text.startsWith('> ')) return <blockquote key={index} className="border-l-4 pl-4 italic text-white/55" style={{ borderColor: '#ff6600' }}>{text.slice(2)}</blockquote>;
+  return <p key={index}>{text}</p>;
+}
+
 export default function WorkDetailModal({ work, onClose }) {
   const acc = '#ff6600';
   const [videoRatio, setVideoRatio] = useState(16 / 9);
@@ -35,7 +46,6 @@ export default function WorkDetailModal({ work, onClose }) {
   const isExternalVideo = work?.type === 'video' && /^https?:\/\//i.test(work?.file_path || '');
   const originalUrl = work?.external_url || work?.source_url || work?.file_path;
   const isLinkOnlyVideo = work?.type === 'video' && !work?.file_path && !!originalUrl;
-  const isExternalArticle = work?.type === 'article' && !!(work?.external_url || work?.source_url);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -158,35 +168,12 @@ export default function WorkDetailModal({ work, onClose }) {
           {work.description && <p className="mb-5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }}>{work.description}</p>}
 
           {work.type === 'article' && work.content && (
-            <div className="mt-4 space-y-3 pt-5 leading-relaxed" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }}>
-              {work.content.split('\n\n').map((block, index) => <p key={index}>{block}</p>)}
+            <div className="mt-4 space-y-4 pt-5 leading-relaxed" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.62)', lineHeight: 1.9 }}>
+              {work.content.split('\n\n').map(renderArticleBlock)}
             </div>
           )}
 
-          {isExternalArticle && (
-            <div className="mt-6 overflow-hidden rounded-2xl" style={{ border: '1px solid rgba(255,255,255,0.08)', background: '#fff' }}>
-              <div className="flex items-center justify-between gap-3 border-b border-black/10 bg-white px-4 py-3">
-                <span className="text-xs font-semibold text-gray-500">站内浏览文章</span>
-                <button
-                  type="button"
-                  onClick={() => openCurrentTab(work.external_url || work.source_url)}
-                  className="rounded-full px-3 py-1.5 text-xs font-semibold text-white"
-                  style={{ background: acc }}
-                >
-                  打开原网页
-                </button>
-              </div>
-              <iframe
-                src={work.external_url || work.source_url}
-                title={work.title}
-                className="h-[68vh] w-full bg-white"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
-          )}
-
-          {(work.external_url || work.source_url) && !isExternalVideo && !isExternalArticle && (
+          {(work.external_url || work.source_url) && !isExternalVideo && work.type !== 'article' && (
             <button
               type="button"
               onClick={() => openCurrentTab(work.external_url || work.source_url)}

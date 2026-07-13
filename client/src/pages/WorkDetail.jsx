@@ -92,23 +92,6 @@ export default function WorkDetail() {
               <img src={assetUrl(work.thumbnail)} alt={work.title} className="w-full max-h-64 object-cover rounded-2xl mb-6" />
             )}
             <ArticleViewer content={work.content} title={work.title} />
-            {(work.external_url || work.source_url) && (
-              <div className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white">
-                <div className="flex items-center justify-between border-b border-black/10 bg-white px-4 py-3">
-                  <span className="text-xs font-semibold text-gray-500">站内浏览文章</span>
-                  <a href={work.external_url || work.source_url} className="rounded-full bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white no-underline" target="_self">
-                    打开原网页
-                  </a>
-                </div>
-                <iframe
-                  src={work.external_url || work.source_url}
-                  title={work.title}
-                  className="h-[72vh] w-full bg-white"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
-            )}
           </div>
         )}
       </div>

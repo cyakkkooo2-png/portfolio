@@ -65,6 +65,60 @@ function pickAll(html, pattern) {
   return [...html.matchAll(pattern)].map(m => decodeHtml(m[1])).filter(Boolean);
 }
 
+function stripHtml(value = '') {
+  return decodeHtml(String(value)
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' '));
+}
+
+function extractArticleContent(html = '') {
+  const cleanHtml = String(html)
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<header[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<aside[\s\S]*?<\/aside>/gi, '');
+
+  const candidates = [
+    /<article[^>]*>([\s\S]*?)<\/article>/i,
+    /<main[^>]*>([\s\S]*?)<\/main>/i,
+    /<div[^>]+class=["'][^"']*(?:article|content|post|entry|detail|正文|text)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+    /<body[^>]*>([\s\S]*?)<\/body>/i,
+  ];
+  const body = pickRaw(cleanHtml, candidates) || cleanHtml;
+  const blocks = [];
+  const blockPattern = /<(h[1-4]|p|li|blockquote)[^>]*>([\s\S]*?)<\/\1>/gi;
+  let match;
+
+  while ((match = blockPattern.exec(body))) {
+    const tag = match[1].toLowerCase();
+    const text = stripHtml(match[2]);
+    if (!text || text.length < 2) continue;
+    if (/^(分享|收藏|评论|点赞|广告|相关阅读|责任编辑|版权声明)$/i.test(text)) continue;
+    if (tag.startsWith('h')) blocks.push(`${'#'.repeat(Math.min(Number(tag[1]) + 1, 4))} ${text}`);
+    else if (tag === 'li') blocks.push(`• ${text}`);
+    else if (tag === 'blockquote') blocks.push(`> ${text}`);
+    else blocks.push(text);
+  }
+
+  if (blocks.length) return [...new Set(blocks)].join('\n\n');
+  return stripHtml(body);
+}
+
+function pickRaw(html, patterns) {
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return '';
+}
+
 function isBilibiliUrl(url = '') {
   return /(^|\.)bilibili\.com|b23\.tv/i.test(url);
 }
@@ -186,6 +240,7 @@ async function extractFromUrl(inputUrl, options = {}) {
   const forceType = ['video', 'article'].includes(options.type) ? options.type : '';
   const resolvedType = forceType || ((videoUrl || isBilibili) ? 'video' : 'article');
   const resolvedVideoUrl = resolvedType === 'video' && !isBilibili ? videoUrl : '';
+  const articleContent = resolvedType === 'article' ? extractArticleContent(html) : '';
 
   return {
     title: bilibiliMeta?.title || title || '未命名作品',
@@ -193,7 +248,7 @@ async function extractFromUrl(inputUrl, options = {}) {
     type: resolvedType,
     file_path: resolvedVideoUrl,
     thumbnail,
-    content: resolvedType === 'article' ? (description || bilibiliMeta?.description || '') : '',
+    content: resolvedType === 'article' ? (articleContent || description || bilibiliMeta?.description || '') : '',
     tags: isBilibili ? Array.from(new Set(['B站', ...(bilibiliMeta?.tags || []), ...tags])) : tags,
     source_url: inputUrl.trim(),
     external_url: sourceUrl,
@@ -384,6 +439,9 @@ router.post('/import-url', authMiddleware, upload.fields([
   try {
     const { url, type } = req.body || {};
     if (!url) return res.status(400).json({ error: '请输入网页链接' });
+    if (type === 'article' && !req.files?.cover?.[0]) {
+      return res.status(400).json({ error: '文章链接需要上传封面' });
+    }
 
     const data = await extractFromUrl(url, { type });
     if (req.files?.cover?.[0]) {

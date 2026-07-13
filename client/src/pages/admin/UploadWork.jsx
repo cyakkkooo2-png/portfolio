@@ -113,7 +113,7 @@ function UrlImportCard({ onImported }) {
       <div className="flex flex-col gap-4 md:flex-row md:items-end">
         <div className="flex-1">
           <h2 className="text-base font-bold text-gray-900">网页链接导入</h2>
-          <p className="mt-1 text-sm text-gray-500">粘贴视频页或文章页链接，自动抓取标题、简介、封面；也可以指定按文章保存。</p>
+          <p className="mt-1 text-sm text-gray-500">粘贴你拥有授权的视频页或文章页链接。文章会导入为站内内容，不嵌入站外页面。</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {[
               { key: 'auto', label: '自动识别' },
@@ -138,7 +138,7 @@ function UrlImportCard({ onImported }) {
           />
           <div className="mt-4 rounded-lg border border-dashed border-blue-200 bg-white/70 p-4">
             <label className="block text-sm font-semibold text-gray-800">手动封面（可选）</label>
-            <p className="mt-1 text-xs text-gray-500">视频或文章都可以手动配一张清晰封面；不传则继续自动尝试抓取。</p>
+            <p className="mt-1 text-xs text-gray-500">视频可选，文章链接必填。封面会显示在作品卡片和详情页。</p>
             <input
               type="file"
               accept="image/*"
