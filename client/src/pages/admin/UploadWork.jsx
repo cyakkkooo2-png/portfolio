@@ -64,6 +64,7 @@ function UtilityUploadCard({ title, description, accept, fieldName, endpoint, bu
 
 function UrlImportCard({ onImported }) {
   const [url, setUrl] = useState('');
+  const [importType, setImportType] = useState('auto');
   const [cover, setCover] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -79,6 +80,7 @@ function UrlImportCard({ onImported }) {
     try {
       const formData = new FormData();
       formData.append('url', url.trim());
+      if (importType !== 'auto') formData.append('type', importType);
       if (cover) formData.append('cover', cover);
 
       const res = await fetch('/api/works/import-url', {
@@ -91,6 +93,7 @@ function UrlImportCard({ onImported }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '导入失败');
       setUrl('');
+      setImportType('auto');
       setCover(null);
       setMessage(`导入成功：${data.work?.title || '新作品'}`);
       onImported?.(data.work);
@@ -106,16 +109,32 @@ function UrlImportCard({ onImported }) {
       <div className="flex flex-col gap-4 md:flex-row md:items-end">
         <div className="flex-1">
           <h2 className="text-base font-bold text-gray-900">网页链接导入</h2>
-          <p className="mt-1 text-sm text-gray-500">粘贴视频页或文章页链接，自动抓取标题、简介、封面和公开视频地址。</p>
+          <p className="mt-1 text-sm text-gray-500">粘贴视频页或文章页链接，自动抓取标题、简介、封面；也可以指定按文章保存。</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[
+              { key: 'auto', label: '自动识别' },
+              { key: 'video', label: '视频链接' },
+              { key: 'article', label: '文章链接' },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setImportType(item.key)}
+                className={`rounded-full px-4 py-2 text-xs font-semibold transition ${importType === item.key ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-gray-600 ring-1 ring-gray-200 hover:ring-blue-200'}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             className="mt-4 w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            placeholder="https://pconline.pcvideo.com.cn/video-37670.html"
+            placeholder={importType === 'article' ? 'https://example.com/article.html' : 'https://pconline.pcvideo.com.cn/video-37670.html'}
           />
           <div className="mt-4 rounded-lg border border-dashed border-blue-200 bg-white/70 p-4">
             <label className="block text-sm font-semibold text-gray-800">手动封面（可选）</label>
-            <p className="mt-1 text-xs text-gray-500">复制自己频道的视频时，建议直接上传一张清晰封面；不传则继续自动尝试抓取。</p>
+            <p className="mt-1 text-xs text-gray-500">视频或文章都可以手动配一张清晰封面；不传则继续自动尝试抓取。</p>
             <input
               type="file"
               accept="image/*"

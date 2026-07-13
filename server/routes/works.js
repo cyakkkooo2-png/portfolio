@@ -146,7 +146,7 @@ async function fetchBilibiliMeta(inputUrl, html) {
   };
 }
 
-async function extractFromUrl(inputUrl) {
+async function extractFromUrl(inputUrl, options = {}) {
   let pageUrl = inputUrl.trim();
   if (!/^https?:\/\//i.test(pageUrl)) throw new Error('请输入完整链接，例如 https://...');
 
@@ -183,14 +183,17 @@ async function extractFromUrl(inputUrl) {
     /<video[^>]+src=["']([^"']+\.mp4[^"']*)["']/i,
   ]);
   const tags = pickAll(html, /<span[^>]+class=["'][^"']*\btag\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi);
+  const forceType = ['video', 'article'].includes(options.type) ? options.type : '';
+  const resolvedType = forceType || ((videoUrl || isBilibili) ? 'video' : 'article');
+  const resolvedVideoUrl = resolvedType === 'video' && !isBilibili ? videoUrl : '';
 
   return {
     title: bilibiliMeta?.title || title || '未命名作品',
     description: bilibiliMeta?.description || description,
-    type: (videoUrl || isBilibili) ? 'video' : 'article',
-    file_path: isBilibili ? '' : videoUrl,
+    type: resolvedType,
+    file_path: resolvedVideoUrl,
     thumbnail,
-    content: (videoUrl || isBilibili) ? '' : description,
+    content: resolvedType === 'article' ? (description || bilibiliMeta?.description || '') : '',
     tags: isBilibili ? Array.from(new Set(['B站', ...(bilibiliMeta?.tags || []), ...tags])) : tags,
     source_url: inputUrl.trim(),
     external_url: sourceUrl,
@@ -379,10 +382,10 @@ router.post('/import-url', authMiddleware, upload.fields([
   { name: 'cover', maxCount: 1 },
 ]), async (req, res) => {
   try {
-    const { url } = req.body || {};
+    const { url, type } = req.body || {};
     if (!url) return res.status(400).json({ error: '请输入网页链接' });
 
-    const data = await extractFromUrl(url);
+    const data = await extractFromUrl(url, { type });
     if (req.files?.cover?.[0]) {
       const f = req.files.cover[0];
       data.thumbnail = await uploadToStorage(f.path, 'articles', f.filename);
