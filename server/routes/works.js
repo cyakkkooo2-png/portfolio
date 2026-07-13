@@ -89,6 +89,13 @@ function normalizeMediaUrl(url = '', baseUrl = '') {
   return value;
 }
 
+function extractBilibiliIds(inputUrl = '', html = '') {
+  const source = `${inputUrl}\n${html}`;
+  const bvid = source.match(/BV[0-9A-Za-z]{10}/i)?.[0];
+  const aid = source.match(/(?:\/video\/av|[?&]aid=|["']aid["']\s*:\s*)(\d+)/i)?.[1];
+  return { bvid, aid };
+}
+
 async function fetchHtml(url) {
   const response = await fetch(url, {
     headers: {
@@ -107,6 +114,38 @@ async function fetchHtml(url) {
   }
 }
 
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
+      Accept: 'application/json,text/plain,*/*',
+      Referer: 'https://www.bilibili.com/',
+      Origin: 'https://www.bilibili.com',
+    },
+  });
+  if (!response.ok) throw new Error(`接口读取失败 (${response.status})`);
+  return response.json();
+}
+
+async function fetchBilibiliMeta(inputUrl, html) {
+  const { bvid, aid } = extractBilibiliIds(inputUrl, html);
+  if (!bvid && !aid) return null;
+
+  const apiUrl = bvid
+    ? `https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`
+    : `https://api.bilibili.com/x/web-interface/view?aid=${encodeURIComponent(aid)}`;
+
+  const json = await fetchJson(apiUrl);
+  if (json?.code !== 0 || !json?.data) return null;
+
+  return {
+    title: json.data.title || '',
+    description: json.data.desc || '',
+    thumbnail: normalizeMediaUrl(json.data.pic || ''),
+    tags: [json.data.tname].filter(Boolean),
+  };
+}
+
 async function extractFromUrl(inputUrl) {
   let pageUrl = inputUrl.trim();
   if (!/^https?:\/\//i.test(pageUrl)) throw new Error('请输入完整链接，例如 https://...');
@@ -117,6 +156,10 @@ async function extractFromUrl(inputUrl) {
   const html = await fetchHtml(pageUrl);
   const sourceUrl = pageUrl;
   const isBilibili = isBilibiliUrl(inputUrl) || isBilibiliUrl(pageUrl);
+  const bilibiliMeta = isBilibili ? await fetchBilibiliMeta(inputUrl, html).catch((err) => {
+    console.warn('Bilibili API fallback failed:', err.message);
+    return null;
+  }) : null;
   const title = pick(html, [
     /<p[^>]+class=["'][^"']*\btit\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i,
     /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
@@ -127,7 +170,7 @@ async function extractFromUrl(inputUrl) {
     /<p[^>]+class=["'][^"']*\bdesc\b[^"']*["'][^>]*>[\s\S]*?<span[^>]*>[^<]*<\/span>([\s\S]*?)<\/p>/i,
     /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,
   ]);
-  const thumbnail = normalizeMediaUrl(pick(html, [
+  const thumbnail = bilibiliMeta?.thumbnail || normalizeMediaUrl(pick(html, [
     /<video[^>]+poster=["']([^"']+)["']/i,
     /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
     /<meta[^>]+itemprop=["']image["'][^>]+content=["']([^"']+)["']/i,
@@ -142,13 +185,13 @@ async function extractFromUrl(inputUrl) {
   const tags = pickAll(html, /<span[^>]+class=["'][^"']*\btag\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi);
 
   return {
-    title: title || '未命名作品',
-    description,
+    title: bilibiliMeta?.title || title || '未命名作品',
+    description: bilibiliMeta?.description || description,
     type: (videoUrl || isBilibili) ? 'video' : 'article',
     file_path: isBilibili ? '' : videoUrl,
     thumbnail,
     content: (videoUrl || isBilibili) ? '' : description,
-    tags: isBilibili ? Array.from(new Set(['B站', ...tags])) : tags,
+    tags: isBilibili ? Array.from(new Set(['B站', ...(bilibiliMeta?.tags || []), ...tags])) : tags,
     source_url: inputUrl.trim(),
     external_url: sourceUrl,
   };
