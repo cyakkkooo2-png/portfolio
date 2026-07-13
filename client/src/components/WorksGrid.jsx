@@ -142,7 +142,17 @@ export default function WorksGrid({ onSelectWork }) {
                       <FilterIcon type={ICONS[work.type] || 'article'} active color="#fff" />
                       {LABELS[work.type] || work.type}
                     </span>
-                    <h3 className="mt-4 text-xl font-bold text-white">{work.title}</h3>
+                    <h3
+                      className="mt-4 overflow-hidden text-xl font-bold leading-tight text-white"
+                      style={{
+                        display: '-webkit-box',
+                        WebkitBoxOrient: 'vertical',
+                        WebkitLineClamp: 2,
+                        textShadow: '0 2px 14px rgba(0,0,0,0.45)',
+                      }}
+                    >
+                      {work.title}
+                    </h3>
                   </div>
                   <div className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full text-xl text-white opacity-0 transition-opacity group-hover:opacity-100" style={{ background: acc }}>→</div>
                 </article>

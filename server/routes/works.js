@@ -76,7 +76,8 @@ function normalizeMediaUrl(url = '', baseUrl = '') {
     .trim();
 
   if (!value) return '';
-  if (value.startsWith('//')) return `https:${value}`;
+  if (value.startsWith('//')) value = `https:${value}`;
+  if (/hdslb\.com/i.test(value)) value = value.replace(/@[^/?#]+(?=([?#]|$))/i, '');
   if (/^https?:\/\//i.test(value)) return value;
   if (value.startsWith('/') && /^https?:\/\//i.test(baseUrl)) {
     try {
@@ -255,7 +256,7 @@ router.get('/proxy-image', async (req, res) => {
       headers: {
         'User-Agent': req.get('user-agent') || 'Mozilla/5.0',
         Accept: req.get('accept') || 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        Referer: new URL(url).origin,
+        Referer: /hdslb\.com/i.test(url) ? 'https://www.bilibili.com/' : new URL(url).origin,
       },
     });
 
