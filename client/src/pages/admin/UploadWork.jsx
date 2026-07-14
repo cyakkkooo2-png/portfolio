@@ -11,6 +11,63 @@ const TYPES = [
   { key: 'article', label: '文章', icon: '📄' },
 ];
 
+// Create a lightweight JPEG cover in the browser. This keeps the server from
+// having to decode video files (which is expensive on Railway's small plans).
+function captureVideoCover(videoFile) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(videoFile);
+    const cleanup = () => {
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(objectUrl);
+    };
+
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+
+    video.onloadedmetadata = () => {
+      // Avoid the first frame, which is often black. For very short clips,
+      // use the middle of the available duration instead.
+      const duration = Number.isFinite(video.duration) ? video.duration : 1;
+      video.currentTime = Math.min(1, Math.max(0.05, duration * 0.1));
+    };
+
+    video.onseeked = () => {
+      const sourceWidth = video.videoWidth;
+      const sourceHeight = video.videoHeight;
+      if (!sourceWidth || !sourceHeight) {
+        cleanup();
+        reject(new Error('视频没有可用画面，无法自动生成封面'));
+        return;
+      }
+
+      const maxWidth = 1280;
+      const scale = Math.min(1, maxWidth / sourceWidth);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(sourceWidth * scale);
+      canvas.height = Math.round(sourceHeight * scale);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        cleanup();
+        if (!blob) {
+          reject(new Error('自动生成视频封面失败，请手动上传封面'));
+          return;
+        }
+        const stem = videoFile.name.replace(/\.[^/.]+$/, '') || 'video-cover';
+        resolve(new File([blob], `${stem}-cover.jpg`, { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.86);
+    };
+
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('浏览器无法读取该视频，请手动上传封面'));
+    };
+    video.src = objectUrl;
+  });
+}
+
 function UtilityUploadCard({ title, description, accept, fieldName, endpoint, buttonText }) {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -207,7 +264,12 @@ export default function UploadWork() {
       formData.append('content', content);
       formData.append('tags', JSON.stringify(tags.split(',').map((tag) => tag.trim()).filter(Boolean)));
       if (file) formData.append(type === 'video' ? 'video' : type === 'image' ? 'image' : 'document', file);
-      if (cover) formData.append('cover', cover);
+      let coverToUpload = cover;
+      if (type === 'video' && !cover) {
+        setProgress({ percent: 0, speed: '正在自动生成视频封面…', fileName });
+        coverToUpload = await captureVideoCover(file);
+      }
+      if (coverToUpload) formData.append('cover', coverToUpload);
 
       await uploadWorkWithProgress(formData, {
         method: 'POST',
@@ -321,6 +383,7 @@ export default function UploadWork() {
 
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">封面图（可选）</label>
+              {type === 'video' && <p className="mb-2 text-xs text-gray-500">未上传封面时，会自动截取视频约第 1 秒的画面作为封面。</p>}
               <input type="file" accept="image/*" onChange={(e) => setCover(e.target.files?.[0] || null)} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
             </div>
 
