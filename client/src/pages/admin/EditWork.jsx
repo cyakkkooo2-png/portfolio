@@ -77,7 +77,7 @@ export default function EditWork() {
 
   if (loading) return <div className="text-center py-20 text-gray-400">加载中...</div>;
 
-  const cls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const cls = "w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
