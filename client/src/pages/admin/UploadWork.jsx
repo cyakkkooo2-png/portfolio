@@ -122,6 +122,7 @@ function UtilityUploadCard({ title, description, accept, fieldName, endpoint, bu
 function UrlImportCard({ onImported }) {
   const [url, setUrl] = useState('');
   const [importType, setImportType] = useState('auto');
+  const [category, setCategory] = useState('');
   const [cover, setCover] = useState(null);
   const [articleContent, setArticleContent] = useState('');
   const [busy, setBusy] = useState(false);
@@ -143,6 +144,7 @@ function UrlImportCard({ onImported }) {
       const formData = new FormData();
       formData.append('url', url.trim());
       if (importType !== 'auto') formData.append('type', importType);
+      if (category.trim()) formData.append('category', category.trim());
       if (cover) formData.append('cover', cover);
       if (articleContent.trim()) formData.append('content', articleContent.trim());
 
@@ -157,6 +159,7 @@ function UrlImportCard({ onImported }) {
       if (!res.ok) throw new Error(data.error || '导入失败');
       setUrl('');
       setImportType('auto');
+      setCategory('');
       setCover(null);
       setArticleContent('');
       setMessage(`导入成功：${data.work?.title || '新作品'}`);
@@ -190,6 +193,15 @@ function UrlImportCard({ onImported }) {
               </button>
             ))}
           </div>
+          {importType === 'video' && (
+            <input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              maxLength={40}
+              placeholder="视频分组，例如：手机评测"
+              className="mt-3 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400"
+            />
+          )}
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -238,6 +250,7 @@ export default function UploadWork() {
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState('');
+  const [category, setCategory] = useState('');
   const [file, setFile] = useState(null);
   const [cover, setCover] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -263,6 +276,7 @@ export default function UploadWork() {
       formData.append('type', type);
       formData.append('content', content);
       formData.append('tags', JSON.stringify(tags.split(',').map((tag) => tag.trim()).filter(Boolean)));
+      formData.append('category', type === 'video' ? category.trim() : '');
       if (file) formData.append(type === 'video' ? 'video' : type === 'image' ? 'image' : 'document', file);
       let coverToUpload = cover;
       if (type === 'video' && !cover) {
@@ -392,6 +406,14 @@ export default function UploadWork() {
               <label className="mb-1 block text-sm font-medium text-gray-700">标签（逗号分隔）</label>
               <input value={tags} onChange={(e) => setTags(e.target.value)} className={inputClass} placeholder="设计, UI, 插画" />
             </div>
+
+            {type === 'video' && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">视频分组（可选）</label>
+                <input value={category} maxLength={40} onChange={(e) => setCategory(e.target.value)} className={inputClass} placeholder="例如：手机评测、旅行记录、Vlog" />
+                <p className="mt-1 text-xs text-gray-500">填写后，前台“视频”板块会自动出现这个分组。</p>
+              </div>
+            )}
 
             {uploading && progress && <ProgressBar percent={progress.percent} fileName={progress.fileName} speed={progress.speed} />}
 

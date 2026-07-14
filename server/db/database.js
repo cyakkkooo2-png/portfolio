@@ -21,10 +21,10 @@ if (!fs.existsSync(USERS_FILE)) {
 // --- Works ---
 function getWorks(filter = {}) {
   const works = JSON.parse(fs.readFileSync(WORKS_FILE, 'utf-8'));
-  if (filter.type) {
-    return works.filter(w => w.type === filter.type).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  }
-  return works.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  return works
+    .filter(w => !filter.type || w.type === filter.type)
+    .filter(w => !filter.category || w.category === filter.category)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 }
 
 function getWorkById(id) {
@@ -47,6 +47,7 @@ function createWork(data) {
     source_url: data.source_url || '',
     external_url: data.external_url || '',
     tags: data.tags || [],
+    category: data.type === 'video' ? (data.category || '') : '',
     created_at: new Date().toISOString(),
   };
   works.push(work);

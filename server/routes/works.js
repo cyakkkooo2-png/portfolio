@@ -481,7 +481,7 @@ async function deleteFromStorage(filePathOrUrl) {
 
 // GET /api/works
 router.get('/', (req, res) => {
-  const works = db.getWorks(req.query.type ? { type: req.query.type } : {});
+  const works = db.getWorks({ type: req.query.type, category: req.query.category });
   res.json({ works });
 });
 
@@ -595,7 +595,7 @@ router.post('/', authMiddleware, upload.fields([
   { name: 'image', maxCount: 1 }, { name: 'video', maxCount: 1 }, { name: 'document', maxCount: 1 }, { name: 'cover', maxCount: 1 },
 ]), async (req, res) => {
   try {
-    const { title, description, type, content, tags } = req.body;
+    const { title, description, type, content, tags, category } = req.body;
     if (!title || !type) return res.status(400).json({ error: '标题和类型为必填项' });
     if (!['video', 'image', 'article'].includes(type)) return res.status(400).json({ error: '无效的类型' });
 
@@ -629,6 +629,7 @@ router.post('/', authMiddleware, upload.fields([
       title, description: description || '', type,
       file_path: filePath, content: content || '', thumbnail,
       tags: typeof tags === 'string' ? JSON.parse(tags) : (tags || []),
+      category: type === 'video' ? String(category || '').trim().slice(0, 40) : '',
       file_size: totalFileSize || null,
     });
 
@@ -644,13 +645,14 @@ router.post('/import-url', authMiddleware, upload.fields([
   { name: 'cover', maxCount: 1 },
 ]), async (req, res) => {
   try {
-    const { url, type, content } = req.body || {};
+    const { url, type, content, category } = req.body || {};
     if (!url) return res.status(400).json({ error: '请输入网页链接' });
     if (type === 'article' && !req.files?.cover?.[0]) {
       return res.status(400).json({ error: '文章链接需要上传封面' });
     }
 
     const data = await extractFromUrl(url, { type, content });
+    data.category = data.type === 'video' ? String(category || '').trim().slice(0, 40) : '';
     if (req.files?.cover?.[0]) {
       const f = req.files.cover[0];
       data.thumbnail = await uploadToStorage(f.path, 'articles', f.filename);
@@ -678,6 +680,10 @@ router.put('/:id', authMiddleware, upload.fields([
     if (req.body.type) updateData.type = req.body.type;
     if (req.body.content !== undefined) updateData.content = req.body.content;
     if (req.body.tags) updateData.tags = typeof req.body.tags === 'string' ? JSON.parse(req.body.tags) : req.body.tags;
+    if (req.body.category !== undefined) {
+      const nextType = req.body.type || existing.type;
+      updateData.category = nextType === 'video' ? String(req.body.category || '').trim().slice(0, 40) : '';
+    }
 
     let totalFileSize = existing.file_size || 0;
 

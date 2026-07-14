@@ -11,6 +11,7 @@ export default function EditWork() {
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState('');
+  const [category, setCategory] = useState('');
   const [file, setFile] = useState(null);
   const [cover, setCover] = useState(null);
   const [existingFile, setExistingFile] = useState('');
@@ -24,7 +25,7 @@ export default function EditWork() {
     getWork(id).then(d => {
       const w = d.work;
       setType(w.type); setTitle(w.title); setDescription(w.description);
-      setContent(w.content); setTags((w.tags || []).join(', '));
+      setContent(w.content); setTags((w.tags || []).join(', ')); setCategory(w.category || '');
       setExistingFile(w.file_path); setExistingCover(w.thumbnail);
     }).catch(e => setError(e.message)).finally(() => setLoading(false));
   }, [id]);
@@ -42,6 +43,7 @@ export default function EditWork() {
       fd.append('title', title); fd.append('description', description);
       fd.append('type', type); fd.append('content', content);
       fd.append('tags', JSON.stringify(tags.split(',').map(t => t.trim()).filter(Boolean)));
+      fd.append('category', type === 'video' ? category.trim() : '');
       if (file) fd.append(type === 'video' ? 'video' : 'image', file);
       if (cover) fd.append('cover', cover);
 
@@ -114,6 +116,11 @@ export default function EditWork() {
 
         <div><label className="block text-sm font-medium text-gray-700 mb-1">标签（逗号分隔）</label>
           <input type="text" value={tags} onChange={e => setTags(e.target.value)} className={cls} /></div>
+
+        {type === 'video' && (
+          <div><label className="block text-sm font-medium text-gray-700 mb-1">视频分组</label>
+            <input type="text" value={category} maxLength={40} onChange={e => setCategory(e.target.value)} placeholder="例如：手机评测" className={cls} /></div>
+        )}
 
         {uploading && progress && <ProgressBar percent={progress.percent} fileName={progress.fileName} speed={progress.speed} />}
 
