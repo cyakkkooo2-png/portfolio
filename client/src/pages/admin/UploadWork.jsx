@@ -11,6 +11,10 @@ const TYPES = [
   { key: 'article', label: '文章', icon: '📄' },
 ];
 
+function fileNameWithoutExtension(value = '') {
+  return String(value).replace(/\.[^/.]+$/, '');
+}
+
 // Create a lightweight JPEG cover in the browser. This keeps the server from
 // having to decode video files (which is expensive on Railway's small plans).
 function captureVideoCover(videoFile) {
@@ -444,6 +448,7 @@ export default function UploadWork() {
                   const selected = Array.from(e.target.files || []);
                   setFile(selected[0] || null);
                   setBatchFiles(type === 'video' ? selected : []);
+                  if (type === 'video' && selected.length === 1) setTitle(fileNameWithoutExtension(selected[0].name));
                 }} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
                 {type === 'video' && <p className="mt-1 text-xs text-gray-500">可按住 Ctrl 或 Shift 一次选择多个视频；系统会按顺序上传。</p>}
                 {batchFiles.length > 1 ? <p className="mt-1 text-xs font-medium text-blue-600">已选择 {batchFiles.length} 个视频，将自动以文件名作为标题。</p> : file && <p className="mt-1 text-xs text-gray-500">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}

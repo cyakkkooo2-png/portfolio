@@ -3,6 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getWork, uploadWorkWithProgress } from '../../api';
 import ProgressBar from '../../components/ProgressBar';
 
+function fileNameWithoutExtension(value = '') {
+  const rawName = String(value).split('/').pop() || '';
+  return rawName.replace(/\.[^/.]+$/, '');
+}
+
 export default function EditWork() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -24,7 +29,7 @@ export default function EditWork() {
   useEffect(() => {
     getWork(id).then(d => {
       const w = d.work;
-      setType(w.type); setTitle(w.title); setDescription(w.description);
+      setType(w.type); setTitle(w.title || fileNameWithoutExtension(w.file_path)); setDescription(w.description);
       setContent(w.content); setTags((w.tags || []).join(', ')); setCategory(w.category || '');
       setExistingFile(w.file_path); setExistingCover(w.thumbnail);
     }).catch(e => setError(e.message)).finally(() => setLoading(false));
@@ -99,7 +104,11 @@ export default function EditWork() {
         {type !== 'article' && (
           <div><label className="block text-sm font-medium text-gray-700 mb-1">{type === 'video' ? '视频' : '图片'}</label>
             {existingFile && !file && <p className="text-xs text-gray-400 mb-2">当前: {existingFile.split('/').pop()}</p>}
-            <input type="file" accept={type === 'video' ? 'video/*' : 'image/*'} onChange={e => setFile(e.target.files[0])}
+            <input type="file" accept={type === 'video' ? 'video/*' : 'image/*'} onChange={e => {
+              const selected = e.target.files?.[0] || null;
+              setFile(selected);
+              if (selected && type === 'video') setTitle(fileNameWithoutExtension(selected.name));
+            }}
               className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700" /></div>
         )}
 
