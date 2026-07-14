@@ -19,17 +19,32 @@ if (!fs.existsSync(USERS_FILE)) {
 }
 
 // --- Works ---
+function fallbackTitle(work) {
+  const savedTitle = String(work.title || '').trim();
+  if (savedTitle) return savedTitle;
+
+  const source = String(work.file_path || work.source_url || '');
+  const rawName = source.split('?')[0].split('/').pop() || '';
+  return rawName.replace(/\.[^/.]+$/, '') || '未命名视频';
+}
+
+function withFallbackTitle(work) {
+  return { ...work, title: fallbackTitle(work) };
+}
+
 function getWorks(filter = {}) {
   const works = JSON.parse(fs.readFileSync(WORKS_FILE, 'utf-8'));
   return works
     .filter(w => !filter.type || w.type === filter.type)
     .filter(w => !filter.category || w.category === filter.category)
+    .map(withFallbackTitle)
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 }
 
 function getWorkById(id) {
   const works = JSON.parse(fs.readFileSync(WORKS_FILE, 'utf-8'));
-  return works.find(w => w.id === id) || null;
+  const work = works.find(w => w.id === id);
+  return work ? withFallbackTitle(work) : null;
 }
 
 function createWork(data) {

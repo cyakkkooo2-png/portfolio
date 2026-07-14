@@ -29,7 +29,7 @@ export default function EditWork() {
   useEffect(() => {
     getWork(id).then(d => {
       const w = d.work;
-      setType(w.type); setTitle(w.title || fileNameWithoutExtension(w.file_path)); setDescription(w.description);
+      setType(w.type); setTitle(String(w.title || '').trim() || fileNameWithoutExtension(w.file_path)); setDescription(w.description);
       setContent(w.content); setTags((w.tags || []).join(', ')); setCategory(w.category || '');
       setExistingFile(w.file_path); setExistingCover(w.thumbnail);
     }).catch(e => setError(e.message)).finally(() => setLoading(false));
