@@ -1,22 +1,11 @@
 const fs = require('fs');
-const path = require('path');
+const { DATA_DIR, dataFile, seedDataFile } = require('../paths');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const WORKS_FILE = path.join(DATA_DIR, 'works.json');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const WORKS_FILE = dataFile('works.json');
+const USERS_FILE = dataFile('users.json');
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-// Initialize files if they don't exist
-if (!fs.existsSync(WORKS_FILE)) {
-  fs.writeFileSync(WORKS_FILE, JSON.stringify([]), { encoding: 'utf8' });
-}
-if (!fs.existsSync(USERS_FILE)) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify([]), { encoding: 'utf8' });
-}
+seedDataFile('works.json', []);
+seedDataFile('users.json', []);
 
 // --- Works ---
 function fallbackTitle(work) {

@@ -3,11 +3,12 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { authMiddleware } = require('../middleware/auth');
+const { dataFile, uploadDir, ensureDir } = require('../paths');
 const router = express.Router();
 
-const UD = path.join(__dirname, '..', 'uploads', 'resumes');
-const RF = path.join(__dirname, '..', 'data', 'resume.json');
-if (!fs.existsSync(UD)) fs.mkdirSync(UD, { recursive: true });
+const UD = uploadDir('resumes');
+const RF = dataFile('resume.json');
+ensureDir(UD);
 
 const upload = multer({
   storage: multer.diskStorage({

@@ -7,16 +7,14 @@ const db = require('../db/database');
 const { authMiddleware } = require('../middleware/auth');
 const githubStorage = require('../github-storage');
 const cosStorage = require('../cos-storage');
+const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
 
 const router = express.Router();
 
-const TMP_DIR = path.join(__dirname, '..', 'tmp');
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
-
-if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
+ensureDir(TMP_DIR);
 ['images', 'videos', 'articles', 'documents'].forEach(s => {
   const p = path.join(UPLOADS_DIR, s);
-  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+  ensureDir(p);
 });
 
 const storage = multer.diskStorage({
@@ -474,7 +472,7 @@ async function deleteFromStorage(filePathOrUrl) {
     try { await githubStorage.deleteFile(filePathOrUrl); } catch {}
   }
   if (filePathOrUrl.startsWith('/uploads/')) {
-    const p = path.join(__dirname, '..', filePathOrUrl);
+    const p = uploadPathFromUrl(filePathOrUrl);
     if (fs.existsSync(p)) fs.unlinkSync(p);
   }
 }

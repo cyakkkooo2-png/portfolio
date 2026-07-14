@@ -3,15 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const { authMiddleware } = require('../middleware/auth');
+const { TMP_DIR, dataFile, uploadDir, ensureDir, uploadPathFromUrl, seedDataFile } = require('../paths');
 
 const router = express.Router();
-const FILE = path.join(__dirname, '..', 'data', 'theme.json');
-const TMP_DIR = path.join(__dirname, '..', 'tmp');
-const ABOUT_DIR = path.join(__dirname, '..', 'uploads', 'about');
+const FILE = dataFile('theme.json');
+const ABOUT_DIR = uploadDir('about');
 
-for (const dir of [TMP_DIR, ABOUT_DIR]) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-}
+for (const dir of [TMP_DIR, ABOUT_DIR]) ensureDir(dir);
 
 const def = {
   heroTag: { text: 'Creative Space · 2026', font: 'Inter', size: 12, color: 'rgba(255,255,255,0.8)' },
@@ -44,6 +42,8 @@ const def = {
   primaryColor: '#3b82f6',
 };
 
+seedDataFile('theme.json', def);
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, TMP_DIR),
@@ -74,7 +74,7 @@ function saveTheme(data) {
 
 function deleteLocalUpload(url) {
   if (!url || !url.startsWith('/uploads/about/')) return;
-  const filePath = path.join(__dirname, '..', url);
+  const filePath = uploadPathFromUrl(url);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 }
 
