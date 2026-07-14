@@ -252,13 +252,62 @@ export default function UploadWork() {
   const [tags, setTags] = useState('');
   const [category, setCategory] = useState('');
   const [file, setFile] = useState(null);
+  const [batchFiles, setBatchFiles] = useState([]);
   const [cover, setCover] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(null);
 
+  async function handleBatchUpload() {
+    setUploading(true);
+    setError('');
+    setProgress({ percent: 0, speed: 'Preparing batch upload...', fileName: `0/${batchFiles.length}` });
+
+    try {
+      for (let index = 0; index < batchFiles.length; index += 1) {
+        const videoFile = batchFiles[index];
+        const titleFromFile = videoFile.name.replace(/\.[^/.]+$/, '') || videoFile.name;
+        const fileName = `(${index + 1}/${batchFiles.length}) ${videoFile.name}`;
+        const formData = new FormData();
+        formData.append('title', titleFromFile);
+        formData.append('description', description);
+        formData.append('type', 'video');
+        formData.append('content', content);
+        formData.append('tags', JSON.stringify(tags.split(',').map((tag) => tag.trim()).filter(Boolean)));
+        formData.append('category', category.trim());
+        formData.append('video', videoFile);
+
+        let coverToUpload = cover;
+        if (!coverToUpload) {
+          setProgress({ percent: Math.round((index / batchFiles.length) * 100), speed: 'Generating video cover...', fileName });
+          coverToUpload = await captureVideoCover(videoFile);
+        }
+        if (coverToUpload) formData.append('cover', coverToUpload);
+
+        await uploadWorkWithProgress(formData, {
+          method: 'POST',
+          onProgress: (uploadProgress) => {
+            const percent = Math.round(((index + (uploadProgress.percent / 100)) / batchFiles.length) * 100);
+            setProgress({ percent, speed: uploadProgress.speed || '', fileName });
+          },
+        });
+      }
+
+      setProgress({ percent: 100, speed: `Uploaded ${batchFiles.length} videos`, fileName: 'Batch complete' });
+      setTimeout(() => navigate('/admin'), 900);
+    } catch (err) {
+      setError(err.message || 'Batch upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
+    if (type === 'video' && batchFiles.length > 1) {
+      await handleBatchUpload();
+      return;
+    }
     if (!title.trim()) return setError('请输入标题');
     if (!file) return setError('请选择文件');
 
@@ -369,7 +418,7 @@ export default function UploadWork() {
           <label className="mb-2 block text-sm font-medium text-gray-700">类型</label>
           <div className="mb-5 flex gap-3">
             {TYPES.map((item) => (
-              <button key={item.key} type="button" onClick={() => setType(item.key)} className={`rounded-lg border px-5 py-2 text-sm font-semibold transition ${type === item.key ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}>
+              <button key={item.key} type="button" onClick={() => { setType(item.key); setFile(null); setBatchFiles([]); }} className={`rounded-lg border px-5 py-2 text-sm font-semibold transition ${type === item.key ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}>
                 {item.icon} {item.label}
               </button>
             ))}
@@ -378,7 +427,8 @@ export default function UploadWork() {
           <div className="space-y-5">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">标题 *</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder="输入标题" required />
+              <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder={type === 'video' && batchFiles.length > 1 ? '批量上传时，自动使用每个视频的文件名' : '输入标题'} required={!(type === 'video' && batchFiles.length > 1)} disabled={type === 'video' && batchFiles.length > 1} />
+              {type === 'video' && batchFiles.length > 1 && <p className="mt-1 text-xs text-gray-500">批量上传会使用每个文件名作为标题，之后可以在后台逐个修改。</p>}
             </div>
 
             <div>
@@ -390,8 +440,13 @@ export default function UploadWork() {
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">{type === 'video' ? '视频文件 *' : type === 'image' ? '图片文件 *' : '文章文档 *'}</label>
                 <p className="mb-2 text-xs text-gray-500">{type === 'article' ? '支持 PDF、Word、TXT 或 Markdown 文档；正文会作为文档保存在作品中。' : ''}</p>
-                <input type="file" accept={type === 'video' ? 'video/*' : type === 'image' ? 'image/*' : '.pdf,.doc,.docx,.txt,.md'} onChange={(e) => setFile(e.target.files?.[0] || null)} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
-                {file && <p className="mt-1 text-xs text-gray-500">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
+                <input type="file" multiple={type === 'video'} accept={type === 'video' ? 'video/*' : type === 'image' ? 'image/*' : '.pdf,.doc,.docx,.txt,.md'} onChange={(e) => {
+                  const selected = Array.from(e.target.files || []);
+                  setFile(selected[0] || null);
+                  setBatchFiles(type === 'video' ? selected : []);
+                }} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
+                {type === 'video' && <p className="mt-1 text-xs text-gray-500">可按住 Ctrl 或 Shift 一次选择多个视频；系统会按顺序上传。</p>}
+                {batchFiles.length > 1 ? <p className="mt-1 text-xs font-medium text-blue-600">已选择 {batchFiles.length} 个视频，将自动以文件名作为标题。</p> : file && <p className="mt-1 text-xs text-gray-500">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
               </div>
             )}
 
