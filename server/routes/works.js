@@ -435,19 +435,25 @@ async function extractFromUrl(inputUrl, options = {}) {
 
 async function uploadToStorage(tmpPath, folder, filename) {
   if (folder === 'videos') {
+    if (process.env.COS_SECRET_ID) {
+      try {
+        return await cosStorage.uploadFile(tmpPath, folder);
+      } catch (err) {
+        console.error('COS upload failed:', err.message);
+      }
+    }
+
+    if (process.env.GITHUB_TOKEN) {
+      try {
+        const result = await githubStorage.uploadFile(tmpPath, folder);
+        if (!result.local) return result.url;
+      } catch (err) {
+        console.error('GitHub video upload failed:', err.message);
+      }
+    }
+
     const localDest = path.join(UPLOADS_DIR, folder, filename);
     fs.copyFileSync(tmpPath, localDest);
-    if (process.env.COS_SECRET_ID) {
-      setImmediate(async () => {
-        try {
-          const cosUrl = await cosStorage.uploadFile(localDest, folder);
-          const works = db.getWorks();
-          const work = works.find(w => w.file_path === `/uploads/videos/${filename}`);
-          if (work) { db.updateWork(work.id, { file_path: cosUrl }); }
-          fs.unlink(localDest, () => {});
-        } catch (err) { console.error('COS bg upload failed:', err.message); }
-      });
-    }
     return `/uploads/videos/${filename}`;
   }
 
@@ -475,6 +481,13 @@ async function deleteFromStorage(filePathOrUrl) {
     const p = uploadPathFromUrl(filePathOrUrl);
     if (fs.existsSync(p)) fs.unlinkSync(p);
   }
+}
+
+function cleanupRequestFiles(files) {
+  if (!files) return;
+  Object.values(files).flat().forEach(f => {
+    if (f?.path && fs.existsSync(f.path)) fs.unlinkSync(f.path);
+  });
 }
 
 // GET /api/works
@@ -618,9 +631,6 @@ router.post('/', authMiddleware, upload.fields([
         thumbnail = await uploadToStorage(f.path, 'articles', f.filename);
         totalFileSize += f.size || 0;
       }
-      Object.values(req.files).flat().forEach(f => {
-        if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-      });
     }
 
     const work = db.createWork({
@@ -635,6 +645,8 @@ router.post('/', authMiddleware, upload.fields([
   } catch (err) {
     console.error('Create error:', err);
     res.status(500).json({ error: '上传失败: ' + err.message });
+  } finally {
+    cleanupRequestFiles(req.files);
   }
 });
 
@@ -654,13 +666,14 @@ router.post('/import-url', authMiddleware, upload.fields([
     if (req.files?.cover?.[0]) {
       const f = req.files.cover[0];
       data.thumbnail = await uploadToStorage(f.path, 'articles', f.filename);
-      if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
     }
     const work = db.createWork(data);
     res.status(201).json({ work, extracted: data });
   } catch (err) {
     console.error('Import URL error:', err);
     res.status(500).json({ error: '导入失败: ' + err.message });
+  } finally {
+    cleanupRequestFiles(req.files);
   }
 });
 
@@ -709,9 +722,6 @@ router.put('/:id', authMiddleware, upload.fields([
         const f = req.files.cover[0];
         updateData.thumbnail = await uploadToStorage(f.path, 'articles', f.filename);
       }
-      Object.values(req.files).flat().forEach(f => {
-        if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
-      });
     }
 
     updateData.file_size = totalFileSize;
@@ -722,6 +732,8 @@ router.put('/:id', authMiddleware, upload.fields([
   } catch (err) {
     console.error('Update error:', err);
     res.status(500).json({ error: '更新失败: ' + err.message });
+  } finally {
+    cleanupRequestFiles(req.files);
   }
 });
 
