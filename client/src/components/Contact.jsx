@@ -21,20 +21,16 @@ export default function Contact() {
   }, []);
 
   return (
-    <section id="contact" className="relative overflow-hidden px-6 py-28 md:px-20" style={{ background: '#fff' }}>
-      <div className="soft-dots pointer-events-none absolute bottom-16 left-12 hidden h-24 w-24 opacity-35 md:block" />
+    <section id="contact" className="relative px-6 py-28 md:px-20" style={{ background: '#fff' }}>
       <div className="mx-auto max-w-5xl">
         <div className="text-center">
-          <span className="section-kicker" style={{ color: '#6d67d8' }}>Let&apos;s connect</span>
           <h2 className="text-gray-900" style={{ fontFamily: "'Playfair Display', 'Noto Serif SC', serif", fontSize: 'clamp(42px, 4vw, 58px)', fontWeight: 900, lineHeight: 1.1 }}>
             <SplitTitle value={t?.contactTitle} fallback="联系合作" />
           </h2>
-          <div className="section-heading-mark" />
           <RichText as="p" value={t?.contactSubtitle} fallback="Get in Touch" className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }} />
         </div>
 
-        <div className="relative mx-auto mt-16 max-w-xl rounded-2xl border bg-white p-10 shadow-lg" style={{ borderColor: '#eef0f4', boxShadow: '0 22px 50px rgba(17,24,39,0.1)' }}>
-          <span className="absolute left-10 right-10 top-0 h-1 rounded-b-full" style={{ background: `linear-gradient(90deg, ${acc}, #ff9d57 55%, #6d67d8)` }} />
+        <div className="mx-auto mt-16 max-w-xl rounded-2xl border bg-white p-10 shadow-lg" style={{ borderColor: '#eef0f4', boxShadow: '0 22px 50px rgba(17,24,39,0.1)' }}>
           <div className="space-y-8">
             <div className="flex items-center gap-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-full text-white" style={{ background: '#6d67d8' }}>
