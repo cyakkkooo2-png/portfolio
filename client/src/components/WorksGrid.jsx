@@ -91,7 +91,31 @@ function FilterIcon({ type, active, color }) {
 
 function SplitTitle({ value, fallback }) {
   const text = txt(value, fallback);
-  if (value?.chars?.some(Boolean)) return <RichText value={value} fallback={fallback} forceFontFamily={DISPLAY_TITLE_FONT} />;
+  if (value?.chars?.some(Boolean)) {
+    const chars = Array.from(text);
+    const charStyles = Array.isArray(value.chars) ? value.chars : [];
+    return (
+      <>
+        {chars.map((char, index) => {
+          const fallbackAccent = index >= Math.max(0, chars.length - 2) ? '#ff6600' : undefined;
+          const color = charStyles[index]?.color || fallbackAccent;
+          return (
+            <span
+              key={`${char}-${index}`}
+              style={{
+                ...(color ? { color } : {}),
+                fontFamily: DISPLAY_TITLE_FONT,
+                fontStyle: 'normal',
+                textDecoration: 'none',
+              }}
+            >
+              {char}
+            </span>
+          );
+        })}
+      </>
+    );
+  }
   if (text.length <= 2) return text;
   return <>{text.slice(0, -2)}<span style={{ color: '#ff6600' }}>{text.slice(-2)}</span></>;
 }
