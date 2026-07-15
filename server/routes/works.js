@@ -435,10 +435,13 @@ async function extractFromUrl(inputUrl, options = {}) {
 
 async function uploadToStorage(tmpPath, folder, filename) {
   if (folder === 'videos') {
+    const uploadErrors = [];
+
     if (process.env.COS_SECRET_ID) {
       try {
         return await cosStorage.uploadFile(tmpPath, folder);
       } catch (err) {
+        uploadErrors.push(`COS: ${err.message}`);
         console.error('COS upload failed:', err.message);
       }
     }
@@ -448,8 +451,13 @@ async function uploadToStorage(tmpPath, folder, filename) {
         const result = await githubStorage.uploadFile(tmpPath, folder);
         if (!result.local) return result.url;
       } catch (err) {
+        uploadErrors.push(`GitHub: ${err.message}`);
         console.error('GitHub video upload failed:', err.message);
       }
+    }
+
+    if (process.env.COS_SECRET_ID || process.env.GITHUB_TOKEN) {
+      throw new Error(`视频外部存储上传失败，请稍后重试或检查存储配置。${uploadErrors.join('；')}`);
     }
 
     const localDest = path.join(UPLOADS_DIR, folder, filename);
@@ -493,6 +501,13 @@ function cleanupRequestFiles(files) {
 // GET /api/works
 router.get('/', (req, res) => {
   const works = db.getWorks({ type: req.query.type, category: req.query.category });
+  res.json({ works });
+});
+
+router.put('/reorder', authMiddleware, (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean) : [];
+  if (!ids.length) return res.status(400).json({ error: '请提供作品排序列表' });
+  const works = db.reorderWorks(ids);
   res.json({ works });
 });
 

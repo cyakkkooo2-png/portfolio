@@ -60,6 +60,13 @@ export function deleteWork(id) {
   });
 }
 
+export function reorderWorks(ids) {
+  return request('/works/reorder', {
+    method: 'PUT',
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export function uploadWorkWithProgress(formData, { onProgress, method = 'POST', workId = null } = {}) {
   return new Promise((resolve, reject) => {
     const token = getToken();

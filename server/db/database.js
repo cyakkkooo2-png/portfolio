@@ -21,13 +21,20 @@ function withFallbackTitle(work) {
   return { ...work, title: fallbackTitle(work) };
 }
 
+function byManualOrder(a, b) {
+  const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.MAX_SAFE_INTEGER;
+  const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.MAX_SAFE_INTEGER;
+  if (ao !== bo) return ao - bo;
+  return new Date(b.created_at) - new Date(a.created_at);
+}
+
 function getWorks(filter = {}) {
   const works = JSON.parse(fs.readFileSync(WORKS_FILE, 'utf-8'));
   return works
     .filter(w => !filter.type || w.type === filter.type)
     .filter(w => !filter.category || w.category === filter.category)
     .map(withFallbackTitle)
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    .sort(byManualOrder);
 }
 
 function getWorkById(id) {
@@ -39,6 +46,7 @@ function getWorkById(id) {
 function createWork(data) {
   const works = JSON.parse(fs.readFileSync(WORKS_FILE, 'utf-8'));
   const { v4: uuidv4 } = require('uuid');
+  const maxOrder = works.reduce((max, work) => Math.max(max, Number(work.order) || 0), 0);
   const work = {
     id: uuidv4(),
     title: data.title,
@@ -52,6 +60,7 @@ function createWork(data) {
     external_url: data.external_url || '',
     tags: data.tags || [],
     category: data.type === 'video' ? (data.category || '') : '',
+    order: maxOrder + 1,
     created_at: new Date().toISOString(),
   };
   works.push(work);
@@ -75,6 +84,20 @@ function deleteWork(id) {
   works.splice(index, 1);
   fs.writeFileSync(WORKS_FILE, JSON.stringify(works, null, 2), { encoding: 'utf8' });
   return true;
+}
+
+function reorderWorks(ids) {
+  const works = JSON.parse(fs.readFileSync(WORKS_FILE, 'utf-8'));
+  const orderMap = new Map(ids.map((id, index) => [id, index + 1]));
+  let nextOrder = ids.length + 1;
+
+  const reordered = works.map((work) => {
+    if (orderMap.has(work.id)) return { ...work, order: orderMap.get(work.id) };
+    return { ...work, order: Number(work.order) || nextOrder++ };
+  });
+
+  fs.writeFileSync(WORKS_FILE, JSON.stringify(reordered, null, 2), { encoding: 'utf8' });
+  return reordered.map(withFallbackTitle).sort(byManualOrder);
 }
 
 // --- Users ---
@@ -101,4 +124,4 @@ function createUser(data) {
   return user;
 }
 
-module.exports = { getWorks, getWorkById, createWork, updateWork, deleteWork, getUserByUsername, getUserById, createUser };
+module.exports = { getWorks, getWorkById, createWork, updateWork, deleteWork, reorderWorks, getUserByUsername, getUserById, createUser };

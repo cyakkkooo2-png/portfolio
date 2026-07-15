@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { getWorks, deleteWork } from '../../api';
+import { getWorks, deleteWork, reorderWorks } from '../../api';
 
 function formatBytes(bytes) {
   if (!bytes) return '-';
@@ -14,6 +14,8 @@ export default function Dashboard() {
   const [resume, setResume] = useState(null);
   const [resumeUploading, setResumeUploading] = useState(false);
   const [search, setSearch] = useState('');
+  const [dragId, setDragId] = useState('');
+  const [savingOrder, setSavingOrder] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -32,6 +34,39 @@ export default function Dashboard() {
     if (!window.confirm('确定删除这个作品吗？')) return;
     await deleteWork(id);
     setWorks((prev) => prev.filter((work) => work.id !== id));
+  }
+
+  async function saveOrder(nextWorks) {
+    setWorks(nextWorks);
+    setSavingOrder(true);
+    try {
+      const data = await reorderWorks(nextWorks.map((work) => work.id));
+      setWorks(data.works || nextWorks);
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
+  async function moveWork(id, direction) {
+    if (search) return;
+    const index = works.findIndex((work) => work.id === id);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= works.length) return;
+    const next = [...works];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    await saveOrder(next);
+  }
+
+  async function dropWork(targetId) {
+    if (!dragId || dragId === targetId || search) return;
+    const from = works.findIndex((work) => work.id === dragId);
+    const to = works.findIndex((work) => work.id === targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...works];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    setDragId('');
+    await saveOrder(next);
   }
 
   async function uploadResume(e) {
@@ -60,6 +95,7 @@ export default function Dashboard() {
   const filtered = search
     ? works.filter((work) => work.title.toLowerCase().includes(search.toLowerCase()))
     : works;
+  const canArrange = !search;
 
   const navs = [
     { k: '/admin', label: '概览', icon: (<svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" /></svg>) },
@@ -104,6 +140,7 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex items-center gap-3">
+            {savingOrder && <span className="text-xs text-gray-400">正在保存排序...</span>}
             <Link to="/admin/upload" className="rounded-lg px-4 py-1.5 text-xs font-medium text-white no-underline transition-opacity hover:opacity-90" style={{ background: '#4f8cf7' }}>+ 上传</Link>
             <div className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: '#4f8cf7' }}>A</div>
           </div>
@@ -117,21 +154,45 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-6">
               <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                <div className="flex items-center justify-between border-b border-gray-100 px-6 py-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-800">作品排序</h2>
+                    <p className="mt-0.5 text-xs text-gray-400">{canArrange ? '拖动左侧手柄，或用上下按钮调整前台展示顺序。' : '搜索状态下暂时不能调整排序。'}</p>
+                  </div>
+                </div>
                 <div className="grid grid-cols-12 gap-4 border-b border-gray-200 bg-gray-50 px-6 py-3 text-xs font-medium uppercase tracking-wider text-gray-500">
-                  <div className="col-span-5">文件名称</div>
+                  <div className="col-span-4">文件名称</div>
                   <div className="col-span-2">类型</div>
                   <div className="col-span-2 text-right">大小</div>
                   <div className="col-span-2">日期</div>
-                  <div className="col-span-1" />
+                  <div className="col-span-2" />
                 </div>
                 {filtered.length === 0 ? (
                   <div className="px-6 py-16 text-center text-sm text-gray-400">
                     {search ? '没有匹配的作品' : '暂无作品'}
                   </div>
                 ) : (
-                  filtered.map((work) => (
-                    <div key={work.id} className="grid grid-cols-12 items-center gap-4 border-b border-gray-50 px-6 py-3 transition-colors hover:bg-gray-50/50">
-                      <div className="col-span-5 flex min-w-0 items-center gap-3">
+                  filtered.map((work, index) => (
+                    <div
+                      key={work.id}
+                      draggable={canArrange}
+                      onDragStart={() => canArrange && setDragId(work.id)}
+                      onDragOver={(event) => canArrange && event.preventDefault()}
+                      onDrop={() => dropWork(work.id)}
+                      onDragEnd={() => setDragId('')}
+                      className={`grid grid-cols-12 items-center gap-4 border-b border-gray-50 px-6 py-3 transition-colors hover:bg-gray-50/50 ${dragId === work.id ? 'bg-blue-50/60 opacity-70' : ''}`}
+                    >
+                      <div className="col-span-4 flex min-w-0 items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={!canArrange || savingOrder}
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-300 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-30"
+                          title="拖拽排序"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01" />
+                          </svg>
+                        </button>
                         <span className="flex-shrink-0 text-lg">{work.type === 'video' ? '🎬' : work.type === 'image' ? '🖼️' : '📄'}</span>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-gray-900">{work.title}</p>
@@ -145,7 +206,23 @@ export default function Dashboard() {
                       </div>
                       <div className="col-span-2 text-right text-sm tabular-nums text-gray-500">{formatBytes(work.file_size)}</div>
                       <div className="col-span-2 text-sm text-gray-400">{new Date(work.created_at).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                      <div className="col-span-1 flex justify-end gap-1">
+                      <div className="col-span-2 flex justify-end gap-1">
+                        <button
+                          onClick={() => moveWork(work.id, -1)}
+                          disabled={!canArrange || savingOrder || index === 0}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-25"
+                          title="上移"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                        </button>
+                        <button
+                          onClick={() => moveWork(work.id, 1)}
+                          disabled={!canArrange || savingOrder || index === filtered.length - 1}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-25"
+                          title="下移"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </button>
                         <Link to={`/admin/edit/${work.id}`} className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600" title="编辑">
                           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                         </Link>
