@@ -31,6 +31,33 @@ function FontSelect({ value, onChange }) {
   );
 }
 
+function StyleButtons({ value = {}, onChange }) {
+  const buttons = [
+    { key: 'bold', label: 'B', title: '加粗', className: 'font-black' },
+    { key: 'italic', label: 'I', title: '斜体', className: 'italic font-semibold' },
+    { key: 'underline', label: 'U', title: '下划线', className: 'underline font-semibold' },
+  ];
+
+  return (
+    <div className="flex gap-1">
+      {buttons.map((button) => {
+        const active = Boolean(value[button.key]);
+        return (
+          <button
+            key={button.key}
+            type="button"
+            title={button.title}
+            onClick={() => onChange({ [button.key]: !active })}
+            className={`h-9 w-9 rounded-lg border text-sm transition ${button.className} ${active ? 'border-blue-500 bg-blue-600 text-white shadow-sm' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-200 hover:bg-blue-50'}`}
+          >
+            {button.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function RichFieldEditor({ label, data, onChange }) {
   const value = typeof data === 'object' && data ? data : { text: data || '' };
   const text = textOf(value);
@@ -71,7 +98,14 @@ function RichFieldEditor({ label, data, onChange }) {
   }
 
   function applyBaseToAll() {
-    const next = styles.map(() => ({ font: value.font || 'Inter', size: value.size || 16, color: value.color || '#111111' }));
+    const next = styles.map(() => ({
+      font: value.font || 'Inter',
+      size: value.size || 16,
+      color: value.color || '#111111',
+      bold: Boolean(value.bold),
+      italic: Boolean(value.italic),
+      underline: Boolean(value.underline),
+    }));
     onChange({ ...value, chars: next });
     selectAll();
   }
@@ -86,7 +120,7 @@ function RichFieldEditor({ label, data, onChange }) {
       <label className="mb-1 block text-xs font-medium text-gray-500">文字内容</label>
       <textarea value={text} onChange={(e) => updateText(e.target.value)} rows={text.length > 34 ? 3 : 1} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-100" />
 
-      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_80px_130px]">
+      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_80px_130px_116px]">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500">默认字体</label>
           <FontSelect value={value.font || 'Inter'} onChange={(font) => updateBase({ font })} />
@@ -101,6 +135,10 @@ function RichFieldEditor({ label, data, onChange }) {
             <input type="color" value={value.color || '#111111'} onChange={(e) => updateBase({ color: e.target.value })} className="h-9 w-9 rounded border-0 p-0" />
             <input value={value.color || '#111111'} onChange={(e) => updateBase({ color: e.target.value })} className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-2 font-mono text-xs text-gray-900 outline-none" />
           </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-500">默认样式</label>
+          <StyleButtons value={value} onChange={updateBase} />
         </div>
       </div>
 
@@ -131,7 +169,7 @@ function RichFieldEditor({ label, data, onChange }) {
             <p className="text-sm font-semibold text-gray-800">正在批量修改：{activeIndexes.length} 个字</p>
             <button type="button" onClick={clearSelectedStyle} className="text-xs font-medium text-gray-500 hover:text-red-600">清除所选字样式</button>
           </div>
-          <div className="grid gap-3 md:grid-cols-[1fr_80px_130px]">
+          <div className="grid gap-3 md:grid-cols-[1fr_80px_130px_116px]">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-500">字体</label>
               <FontSelect value={current.font || value.font || 'Inter'} onChange={(font) => updateSelected({ font })} />
@@ -147,16 +185,27 @@ function RichFieldEditor({ label, data, onChange }) {
                 <input value={current.color || value.color || '#111111'} onChange={(e) => updateSelected({ color: e.target.value })} className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-2 font-mono text-xs text-gray-900 outline-none" />
               </div>
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500">样式</label>
+              <StyleButtons
+                value={{
+                  bold: Boolean(current.bold ?? value.bold),
+                  italic: Boolean(current.italic ?? value.italic),
+                  underline: Boolean(current.underline ?? value.underline),
+                }}
+                onChange={updateSelected}
+              />
+            </div>
           </div>
         </div>
       )}
 
       <div className="mt-4 rounded-lg border border-gray-100 bg-white p-3">
         <p className="mb-2 text-xs font-medium text-gray-400">预览</p>
-        <p style={{ fontFamily: `"${value.font || 'Inter'}"`, fontSize: `${value.size || 16}px`, color: value.color || '#111111' }}>
+        <p style={{ fontFamily: `"${value.font || 'Inter'}"`, fontSize: `${value.size || 16}px`, color: value.color || '#111111', ...(value.bold ? { fontWeight: 700 } : {}), ...(value.italic ? { fontStyle: 'italic' } : {}), ...(value.underline ? { textDecoration: 'underline' } : {}) }}>
           {chars.map((char, index) => {
             const charStyle = styles[index] || {};
-            return <span key={`${char}-preview-${index}`} style={{ ...(charStyle.font ? { fontFamily: `"${charStyle.font}"` } : {}), ...(charStyle.size ? { fontSize: `${charStyle.size}px` } : {}), ...(charStyle.color ? { color: charStyle.color } : {}) }}>{char}</span>;
+            return <span key={`${char}-preview-${index}`} style={{ ...(charStyle.font ? { fontFamily: `"${charStyle.font}"` } : {}), ...(charStyle.size ? { fontSize: `${charStyle.size}px` } : {}), ...(charStyle.color ? { color: charStyle.color } : {}), ...(charStyle.bold ? { fontWeight: 700 } : {}), ...(charStyle.italic ? { fontStyle: 'italic' } : {}), ...(charStyle.underline ? { textDecoration: 'underline' } : {}) }}>{char}</span>;
           })}
         </p>
       </div>

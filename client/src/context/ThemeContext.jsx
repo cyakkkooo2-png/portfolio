@@ -40,6 +40,9 @@ export function RichText({ value, fallback, className = '', style = {}, as: Tag 
     ...(base.font ? { fontFamily: `"${base.font}"` } : {}),
     ...(base.size ? { fontSize: `${base.size}px` } : {}),
     ...(base.color ? { color: base.color } : {}),
+    ...(base.bold ? { fontWeight: 700 } : {}),
+    ...(base.italic ? { fontStyle: 'italic' } : {}),
+    ...(base.underline ? { textDecoration: 'underline' } : {}),
     ...style,
     ...(forceColor ? { color: forceColor } : {}),
   };
@@ -56,6 +59,9 @@ export function RichText({ value, fallback, className = '', style = {}, as: Tag 
           ...(cs.font ? { fontFamily: `"${cs.font}"` } : {}),
           ...(cs.size ? { fontSize: `${cs.size}px` } : {}),
           ...(cs.color ? { color: cs.color } : {}),
+          ...(cs.bold ? { fontWeight: 700 } : {}),
+          ...(cs.italic ? { fontStyle: 'italic' } : {}),
+          ...(cs.underline ? { textDecoration: 'underline' } : {}),
           ...(forceColor ? { color: forceColor } : {}),
         };
         return <span key={`${char}-${i}`} style={spanStyle}>{char}</span>;
