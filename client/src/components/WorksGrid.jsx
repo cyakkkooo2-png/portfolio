@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 
 const FEATURED_LIMIT = 9;
-const DISPLAY_TITLE_FONT = "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif";
+const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 
 const FILTERS = [
   { k: 'featured', l: '精选', icon: 'spark' },

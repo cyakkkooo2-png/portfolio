@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 
-const DISPLAY_TITLE_FONT = "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif";
+const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 
 function SplitTitle({ value, fallback }) {
   const text = txt(value, fallback);

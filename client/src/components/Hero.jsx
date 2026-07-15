@@ -1,6 +1,6 @@
 import { RichText, useTheme } from '../context/ThemeContext';
 
-const DISPLAY_TITLE_FONT = "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif";
+const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 
 function ChipIcon({ type, color }) {
   const common = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
