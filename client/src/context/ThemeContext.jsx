@@ -31,7 +31,7 @@ export function fnt(val, df, ds, dc) {
   };
 }
 
-export function RichText({ value, fallback, className = '', style = {}, as: Tag = 'span', forceColor }) {
+export function RichText({ value, fallback, className = '', style = {}, as: Tag = 'span', forceColor, forceFontFamily }) {
   const text = txt(value, fallback);
   const base = typeof value === 'object' ? value : {};
   const chars = Array.from(text);
@@ -45,6 +45,7 @@ export function RichText({ value, fallback, className = '', style = {}, as: Tag 
     ...(base.underline ? { textDecoration: 'underline' } : {}),
     ...style,
     ...(forceColor ? { color: forceColor } : {}),
+    ...(forceFontFamily ? { fontFamily: forceFontFamily } : {}),
   };
 
   if (!charStyles.some(Boolean)) {
@@ -63,6 +64,7 @@ export function RichText({ value, fallback, className = '', style = {}, as: Tag 
           ...(cs.italic ? { fontStyle: 'italic' } : {}),
           ...(cs.underline ? { textDecoration: 'underline' } : {}),
           ...(forceColor ? { color: forceColor } : {}),
+          ...(forceFontFamily ? { fontFamily: forceFontFamily } : {}),
         };
         return <span key={`${char}-${i}`} style={spanStyle}>{char}</span>;
       })}

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 
 const FEATURED_LIMIT = 9;
+const DISPLAY_TITLE_FONT = "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif";
 
 const FILTERS = [
   { k: 'featured', l: '精选', icon: 'spark' },
@@ -90,7 +91,7 @@ function FilterIcon({ type, active, color }) {
 
 function SplitTitle({ value, fallback }) {
   const text = txt(value, fallback);
-  if (value?.chars?.some(Boolean)) return <RichText value={value} fallback={fallback} />;
+  if (value?.chars?.some(Boolean)) return <RichText value={value} fallback={fallback} forceFontFamily={DISPLAY_TITLE_FONT} />;
   if (text.length <= 2) return text;
   return <>{text.slice(0, -2)}<span style={{ color: '#ff6600' }}>{text.slice(-2)}</span></>;
 }
@@ -196,7 +197,7 @@ export default function WorksGrid({ onSelectWork }) {
     <section id="work" className="relative px-6 py-24 md:px-20" style={{ background: '#fff' }}>
       <div className="mx-auto max-w-6xl">
         <div className="text-center">
-          <h2 className="text-gray-900" style={{ fontFamily: "'Playfair Display', 'Noto Serif SC', serif", fontSize: 'clamp(42px, 4vw, 58px)', fontWeight: 900, lineHeight: 1.1 }}>
+          <h2 className="text-gray-900" style={{ fontFamily: DISPLAY_TITLE_FONT, fontSize: 'clamp(42px, 4vw, 58px)', fontWeight: 900, lineHeight: 1.1 }}>
             <SplitTitle value={t?.worksTitle} fallback="部分作品" />
           </h2>
           <RichText as="p" value={t?.worksSubtitle} fallback="Selected works across video, image and writing" className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }} />

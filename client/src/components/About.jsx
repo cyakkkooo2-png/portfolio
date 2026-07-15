@@ -1,8 +1,10 @@
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 
+const DISPLAY_TITLE_FONT = "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif";
+
 function SplitTitle({ value, fallback }) {
   const text = txt(value, fallback);
-  if (value?.chars?.some(Boolean)) return <RichText value={value} fallback={fallback} />;
+  if (value?.chars?.some(Boolean)) return <RichText value={value} fallback={fallback} forceFontFamily={DISPLAY_TITLE_FONT} />;
   if (text.length <= 1) return text;
   return <>{text.slice(0, -1)}<span style={{ color: '#ff6600' }}>{text.slice(-1)}</span></>;
 }
@@ -15,7 +17,7 @@ export default function About() {
     <section id="about" className="relative px-6 py-24 md:px-20" style={{ background: '#f3f3f3' }}>
       <div className="mx-auto max-w-6xl">
         <div className="mb-16 text-center">
-          <h2 className="text-gray-900" style={{ fontFamily: "'Playfair Display', 'Noto Serif SC', serif", fontSize: 'clamp(42px, 4vw, 56px)', fontWeight: 900, lineHeight: 1.1 }}>
+          <h2 className="text-gray-900" style={{ fontFamily: DISPLAY_TITLE_FONT, fontSize: 'clamp(42px, 4vw, 56px)', fontWeight: 900, lineHeight: 1.1 }}>
             <SplitTitle value={t?.aboutTitle} fallback="关于我" />
           </h2>
           <p className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }}>About Me</p>

@@ -1,5 +1,7 @@
 import { RichText, useTheme } from '../context/ThemeContext';
 
+const DISPLAY_TITLE_FONT = "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif";
+
 function ChipIcon({ type, color }) {
   const common = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
   if (type === 'video') return <svg {...common}><path d="M5 7.5h9.5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Z" /><path d="m16.5 10 4-2.2v8.4l-4-2.2" /><path d="M7 11h3" /></svg>;
@@ -36,7 +38,8 @@ export default function Hero() {
           value={t?.heroTitle}
           fallback="创意.空间"
           className="mt-8 text-white"
-          style={{ fontFamily: "'Playfair Display', 'Noto Serif SC', serif", fontSize: 'clamp(56px, 6vw, 86px)', fontWeight: 900, lineHeight: 1.05 }}
+          forceFontFamily={DISPLAY_TITLE_FONT}
+          style={{ fontFamily: DISPLAY_TITLE_FONT, fontSize: 'clamp(56px, 6vw, 86px)', fontWeight: 900, lineHeight: 1.05 }}
         />
 
         <RichText
