@@ -542,6 +542,42 @@ router.delete('/cleanup-local-videos', authMiddleware, (req, res) => {
   }
 });
 
+router.post('/migrate-local-videos', authMiddleware, async (req, res) => {
+  try {
+    const works = db.getWorks();
+    const migrated = [];
+    const failed = [];
+
+    if (!process.env.COS_SECRET_ID && !process.env.GITHUB_TOKEN) {
+      return res.status(400).json({ error: '未配置外部视频存储，无法迁移本地视频' });
+    }
+
+    for (const work of works) {
+      if (work.type !== 'video' || !String(work.file_path || '').startsWith('/uploads/videos/')) continue;
+
+      const filePath = uploadPathFromUrl(work.file_path);
+      if (!filePath || !fs.existsSync(filePath)) {
+        failed.push({ id: work.id, title: work.title, error: '本地文件不存在' });
+        continue;
+      }
+
+      try {
+        const nextUrl = await uploadToStorage(filePath, 'videos', path.basename(filePath));
+        db.updateWork(work.id, { file_path: nextUrl });
+        fs.unlinkSync(filePath);
+        migrated.push({ id: work.id, title: work.title, url: nextUrl });
+      } catch (err) {
+        failed.push({ id: work.id, title: work.title, error: err.message });
+      }
+    }
+
+    res.json({ migrated, failed });
+  } catch (err) {
+    console.error('Migrate local videos error:', err);
+    res.status(500).json({ error: '迁移失败: ' + err.message });
+  }
+});
+
 // GET /api/works/proxy-video?url=...
 // Browser playback can fail when an imported external MP4 is embedded directly.
 // This streams only URLs that already exist in saved works, so it cannot be used as an open proxy.
