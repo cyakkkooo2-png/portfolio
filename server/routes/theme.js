@@ -17,7 +17,7 @@ const def = {
   heroSubtitle: { text: '用镜头捕捉瞬间，用文字记录思考。这里是视频、影像与文字的创意集合。', font: 'Inter', size: 18, color: 'rgba(255,255,255,0.65)' },
   heroBtn1: { text: '查看作品', font: 'Inter', size: 14, color: '#ffffff' },
   heroBtn2: { text: '联系我', font: 'Inter', size: 14, color: '#ffffff' },
-  worksTitle: { text: '精选作品', font: 'Playfair Display', size: 48, color: '#111111' },
+  worksTitle: { text: '部分作品', font: 'Playfair Display', size: 48, color: '#111111' },
   worksSubtitle: { text: 'Selected works across video, image and writing', font: 'Inter', size: 16, color: '#9ca3af' },
   worksEmpty: { text: '还没有作品', font: 'Inter', size: 16, color: '#9ca3af' },
   aboutTitle: { text: '关于我', font: 'Playfair Display', size: 48, color: '#111111' },

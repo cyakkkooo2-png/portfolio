@@ -197,7 +197,7 @@ export default function WorksGrid({ onSelectWork }) {
       <div className="mx-auto max-w-6xl">
         <div className="text-center">
           <h2 className="text-gray-900" style={{ fontFamily: "'Playfair Display', 'Noto Serif SC', serif", fontSize: 'clamp(42px, 4vw, 58px)', fontWeight: 900, lineHeight: 1.1 }}>
-            <SplitTitle value={t?.worksTitle} fallback="精选作品" />
+            <SplitTitle value={t?.worksTitle} fallback="部分作品" />
           </h2>
           <RichText as="p" value={t?.worksSubtitle} fallback="Selected works across video, image and writing" className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }} />
           {canArrange && (
