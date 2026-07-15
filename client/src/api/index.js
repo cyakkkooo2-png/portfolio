@@ -67,6 +67,13 @@ export function reorderWorks(ids) {
   });
 }
 
+export function migrateLocalVideos() {
+  return request('/works/migrate-local-videos', {
+    method: 'POST',
+    body: JSON.stringify({ confirm: true }),
+  });
+}
+
 export function uploadWorkWithProgress(formData, { onProgress, method = 'POST', workId = null } = {}) {
   return new Promise((resolve, reject) => {
     const token = getToken();

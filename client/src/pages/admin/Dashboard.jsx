@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { getWorks, deleteWork, reorderWorks } from '../../api';
+import { getWorks, deleteWork, reorderWorks, migrateLocalVideos } from '../../api';
 
 function formatBytes(bytes) {
   if (!bytes) return '-';
@@ -16,6 +16,8 @@ export default function Dashboard() {
   const [search, setSearch] = useState('');
   const [dragId, setDragId] = useState('');
   const [savingOrder, setSavingOrder] = useState(false);
+  const [migratingVideos, setMigratingVideos] = useState(false);
+  const [migrationResult, setMigrationResult] = useState(null);
   const location = useLocation();
 
   useEffect(() => {
@@ -90,6 +92,23 @@ export default function Dashboard() {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
     setResume(null);
+  }
+
+  async function handleMigrateVideos() {
+    const ok = window.confirm('确认开始迁移本地视频吗？迁移成功后会把视频链接改为外部存储地址，并删除 Railway 本地视频副本以释放空间。失败的视频会保留本地副本。');
+    if (!ok) return;
+    setMigratingVideos(true);
+    setMigrationResult(null);
+    try {
+      const result = await migrateLocalVideos();
+      setMigrationResult(result);
+      const data = await getWorks();
+      setWorks(data.works || []);
+    } catch (err) {
+      setMigrationResult({ error: err.message || '迁移失败' });
+    } finally {
+      setMigratingVideos(false);
+    }
   }
 
   const filtered = search
@@ -233,6 +252,32 @@ export default function Dashboard() {
                     </div>
                   ))
                 )}
+              </div>
+
+              <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-800">存储维护</h3>
+                    <p className="mt-1 text-xs leading-5 text-gray-500">
+                      将当前还存放在 Railway 本地硬盘的视频迁移到外部存储。迁移成功后会删除本地副本以释放空间；失败的视频会保留本地副本。
+                    </p>
+                    {migrationResult && (
+                      <p className={`mt-2 text-xs ${migrationResult.error ? 'text-red-600' : 'text-green-700'}`}>
+                        {migrationResult.error
+                          ? migrationResult.error
+                          : `迁移完成：成功 ${migrationResult.migrated?.length || 0} 个，失败 ${migrationResult.failed?.length || 0} 个。`}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleMigrateVideos}
+                    disabled={migratingVideos}
+                    className="shrink-0 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {migratingVideos ? '迁移中...' : '迁移本地视频'}
+                  </button>
+                </div>
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-white p-5">
