@@ -103,8 +103,26 @@ function moveItem(list, from, to) {
 }
 
 function workCardIdAtPoint(x, y) {
-  const element = document.elementFromPoint(x, y)?.closest?.('[data-work-card]');
-  return element?.getAttribute('data-work-card') || '';
+  const cards = Array.from(document.querySelectorAll('[data-work-card]'));
+  let nearest = '';
+  let nearestDistance = Number.POSITIVE_INFINITY;
+
+  for (const card of cards) {
+    const rect = card.getBoundingClientRect();
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+      return card.getAttribute('data-work-card') || '';
+    }
+
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const distance = Math.hypot(centerX - x, centerY - y);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = card.getAttribute('data-work-card') || '';
+    }
+  }
+
+  return nearest;
 }
 
 export default function WorksGrid({ onSelectWork }) {
@@ -178,12 +196,14 @@ export default function WorksGrid({ onSelectWork }) {
     if (!canArrange || savingOrder) return;
     event.preventDefault();
     event.stopPropagation();
+    const startX = event.clientX;
+    const startY = event.clientY;
     setDragId(id);
     setDropId(id);
 
     let moved = false;
     const handleMove = (moveEvent) => {
-      moved = true;
+      if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 8) moved = true;
       const targetId = workCardIdAtPoint(moveEvent.clientX, moveEvent.clientY);
       if (targetId) setDropId(targetId);
     };
@@ -198,6 +218,8 @@ export default function WorksGrid({ onSelectWork }) {
         setSuppressClick(true);
         reorderVisible(id, targetId);
         window.setTimeout(() => setSuppressClick(false), 250);
+      } else if (!moved) {
+        onSelectWork?.(works.find((work) => work.id === id));
       }
     };
 
@@ -216,7 +238,7 @@ export default function WorksGrid({ onSelectWork }) {
           <RichText as="p" value={t?.worksSubtitle} fallback="Selected works across video, image and writing" className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }} />
           {canArrange && (
             <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-600">
-              <span>{savingOrder ? '正在保存排序…' : '已登录：按住作品卡片左上角“拖动”手柄即可排序，前 9 个会显示在精选'}</span>
+              <span>{savingOrder ? '正在保存排序…' : '已登录：按住任意作品卡片拖动即可排序，前 9 个会显示在精选'}</span>
             </div>
           )}
         </div>
@@ -281,8 +303,11 @@ export default function WorksGrid({ onSelectWork }) {
                 <article
                   key={work.id}
                   data-work-card={work.id}
-                  className={`group relative aspect-video cursor-pointer overflow-hidden rounded-2xl transition-transform hover:-translate-y-1 ${dropId === work.id ? 'ring-4 ring-orange-300' : ''} ${dragId === work.id ? 'opacity-60' : ''}`}
+                  className={`group relative aspect-video touch-none select-none overflow-hidden rounded-2xl transition-transform hover:-translate-y-1 ${canArrange ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${dropId === work.id ? 'ring-4 ring-orange-300' : ''} ${dragId === work.id ? 'opacity-60' : ''}`}
                   style={{ background: '#0f1322', boxShadow: '0 28px 55px rgba(15,19,34,0.14)' }}
+                  onPointerDown={(event) => {
+                    if (canArrange) startPointerDrag(event, work.id);
+                  }}
                   onClick={() => {
                     if (dragId || suppressClick) return;
                     onSelectWork?.(work);
@@ -292,15 +317,14 @@ export default function WorksGrid({ onSelectWork }) {
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0.08) 0%, rgba(6,8,18,0.92) 100%)' }} />
                   {canArrange && (
                     <div
-                      className="absolute left-4 top-4 z-10 flex touch-none cursor-move select-none items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-gray-700 shadow-lg backdrop-blur"
+                      className="absolute left-4 top-4 z-10 flex touch-none cursor-grab select-none items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-gray-700 shadow-lg backdrop-blur"
                       title="按住拖动排序"
-                      onPointerDown={(event) => startPointerDrag(event, work.id)}
                       onClick={(event) => event.stopPropagation()}
                     >
                       <span className="grid h-4 w-4 grid-cols-2 gap-0.5">
                         {Array.from({ length: 4 }).map((_, index) => <i key={index} className="rounded-sm bg-orange-500" />)}
                       </span>
-                      拖动
+                      可拖动
                     </div>
                   )}
                   <div className="absolute bottom-7 left-7 right-7">
