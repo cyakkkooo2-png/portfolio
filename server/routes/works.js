@@ -511,6 +511,37 @@ router.put('/reorder', authMiddleware, (req, res) => {
   res.json({ works });
 });
 
+router.delete('/cleanup-local-videos', authMiddleware, (req, res) => {
+  try {
+    const videosDir = path.join(UPLOADS_DIR, 'videos');
+    const referenced = new Set(
+      db.getWorks()
+        .map((work) => work.file_path)
+        .filter((filePath) => typeof filePath === 'string' && filePath.startsWith('/uploads/videos/'))
+        .map((filePath) => path.basename(filePath))
+    );
+
+    if (!fs.existsSync(videosDir)) return res.json({ deleted: 0, freedBytes: 0 });
+
+    let deleted = 0;
+    let freedBytes = 0;
+    for (const fileName of fs.readdirSync(videosDir)) {
+      if (referenced.has(fileName)) continue;
+      const filePath = path.join(videosDir, fileName);
+      const stat = fs.statSync(filePath);
+      if (!stat.isFile()) continue;
+      freedBytes += stat.size;
+      fs.unlinkSync(filePath);
+      deleted += 1;
+    }
+
+    res.json({ deleted, freedBytes });
+  } catch (err) {
+    console.error('Cleanup local videos error:', err);
+    res.status(500).json({ error: '清理失败: ' + err.message });
+  }
+});
+
 // GET /api/works/proxy-video?url=...
 // Browser playback can fail when an imported external MP4 is embedded directly.
 // This streams only URLs that already exist in saved works, so it cannot be used as an open proxy.
