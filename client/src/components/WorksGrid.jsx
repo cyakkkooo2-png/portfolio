@@ -136,11 +136,12 @@ export default function WorksGrid({ onSelectWork }) {
   }, [filter, videoCategory, works]);
 
   async function saveOrder(nextWorks) {
+    const safeWorks = nextWorks.filter((work) => work && work.id);
     setSavingOrder(true);
-    setWorks(nextWorks);
+    setWorks(safeWorks);
     try {
-      const data = await reorderWorks(nextWorks.map((work) => work.id));
-      setWorks(data.works || nextWorks);
+      const data = await reorderWorks(safeWorks.map((work) => work.id));
+      setWorks(data.works || safeWorks);
     } catch (err) {
       alert(err.message || '保存排序失败');
       getWorks().then((data) => setWorks(data.works || []));
@@ -158,12 +159,13 @@ export default function WorksGrid({ onSelectWork }) {
     if (fromVisible < 0 || toVisible < 0) return;
 
     const reorderedVisibleIds = moveItem(visibleIds, fromVisible, toVisible);
+    const visibleSet = new Set(visibleIds);
+    const workById = new Map(works.map((work) => [work.id, work]));
     let cursor = 0;
-    const nextWorks = works.map((work) => (
-      visibleIds.includes(work.id)
-        ? works.find((item) => item.id === reorderedVisibleIds[cursor++])
-        : work
-    ));
+    const nextWorks = works.map((work) => {
+      if (!visibleSet.has(work.id)) return work;
+      return workById.get(reorderedVisibleIds[cursor++]) || work;
+    });
     saveOrder(nextWorks);
   }
 
