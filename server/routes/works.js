@@ -437,15 +437,6 @@ async function uploadToStorage(tmpPath, folder, filename) {
   if (folder === 'videos') {
     const uploadErrors = [];
 
-    if (process.env.COS_SECRET_ID) {
-      try {
-        return await cosStorage.uploadFile(tmpPath, folder);
-      } catch (err) {
-        uploadErrors.push(`COS: ${err.message}`);
-        console.error('COS upload failed:', err.message);
-      }
-    }
-
     if (process.env.GITHUB_TOKEN) {
       try {
         const result = await githubStorage.uploadFile(tmpPath, folder);
@@ -453,6 +444,15 @@ async function uploadToStorage(tmpPath, folder, filename) {
       } catch (err) {
         uploadErrors.push(`GitHub: ${err.message}`);
         console.error('GitHub video upload failed:', err.message);
+      }
+    }
+
+    if (process.env.COS_SECRET_ID) {
+      try {
+        return await cosStorage.uploadFile(tmpPath, folder);
+      } catch (err) {
+        uploadErrors.push(`COS: ${err.message}`);
+        console.error('COS upload failed:', err.message);
       }
     }
 
@@ -496,6 +496,50 @@ function cleanupRequestFiles(files) {
   Object.values(files).flat().forEach(f => {
     if (f?.path && fs.existsSync(f.path)) fs.unlinkSync(f.path);
   });
+}
+
+function normalizeDuplicateValue(value = '') {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/[?#].*$/, '')
+    .replace(/\/$/, '');
+}
+
+function originalNameKey(name = '') {
+  return normalizeDuplicateValue(String(name || '').replace(/\.[^/.]+$/, ''));
+}
+
+function findDuplicateWork({ title = '', type = '', sourceUrl = '', filePath = '', originalName = '' }, excludeId = '') {
+  const titleKey = normalizeDuplicateValue(title);
+  const sourceKey = normalizeDuplicateValue(sourceUrl);
+  const fileKey = normalizeDuplicateValue(filePath);
+  const nameKey = originalNameKey(originalName);
+
+  return db.getWorks().find((work) => {
+    if (excludeId && work.id === excludeId) return false;
+    if (type && work.type !== type) return false;
+
+    const workTitle = normalizeDuplicateValue(work.title);
+    const workSource = normalizeDuplicateValue(work.source_url || work.external_url);
+    const workFile = normalizeDuplicateValue(work.file_path);
+    const workFileName = originalNameKey(work.file_path?.split('/').pop() || '');
+
+    return (
+      (sourceKey && sourceKey === workSource) ||
+      (fileKey && fileKey === workFile) ||
+      (nameKey && nameKey === workFileName) ||
+      (titleKey && titleKey === workTitle)
+    );
+  });
+}
+
+function rejectDuplicate(res, duplicate) {
+  if (!duplicate) return false;
+  res.status(409).json({ error: `作品已存在：${duplicate.title || '同名作品'}` });
+  return true;
 }
 
 // GET /api/works
@@ -692,6 +736,13 @@ router.post('/', authMiddleware, upload.fields([
     if (!title || !type) return res.status(400).json({ error: '标题和类型为必填项' });
     if (!['video', 'image', 'article'].includes(type)) return res.status(400).json({ error: '无效的类型' });
 
+    const incomingFile = req.files?.video?.[0] || req.files?.image?.[0] || req.files?.document?.[0];
+    if (rejectDuplicate(res, findDuplicateWork({
+      title,
+      type,
+      originalName: incomingFile?.originalname,
+    }))) return;
+
     let filePath = '', thumbnail = '', totalFileSize = 0;
 
     if (req.files) {
@@ -745,6 +796,13 @@ router.post('/import-url', authMiddleware, upload.fields([
 
     const data = await extractFromUrl(url, { type, content });
     data.category = data.type === 'video' ? String(category || '').trim().slice(0, 40) : '';
+    if (rejectDuplicate(res, findDuplicateWork({
+      title: data.title,
+      type: data.type,
+      sourceUrl: data.source_url || data.external_url || url,
+      filePath: data.file_path,
+    }))) return;
+
     if (req.files?.cover?.[0]) {
       const f = req.files.cover[0];
       data.thumbnail = await uploadToStorage(f.path, 'articles', f.filename);
@@ -777,6 +835,17 @@ router.put('/:id', authMiddleware, upload.fields([
       const nextType = req.body.type || existing.type;
       updateData.category = nextType === 'video' ? String(req.body.category || '').trim().slice(0, 40) : '';
     }
+
+    const incomingFile = req.files?.video?.[0] || req.files?.image?.[0] || req.files?.document?.[0];
+    const candidateType = updateData.type || existing.type;
+    const candidateTitle = updateData.title || existing.title;
+    if (rejectDuplicate(res, findDuplicateWork({
+      title: candidateTitle,
+      type: candidateType,
+      sourceUrl: existing.source_url || existing.external_url,
+      filePath: existing.file_path,
+      originalName: incomingFile?.originalname,
+    }, existing.id))) return;
 
     let totalFileSize = existing.file_size || 0;
 

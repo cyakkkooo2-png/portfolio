@@ -173,6 +173,14 @@ async function uploadLargeFile(filePath, folder) {
 async function uploadFile(filePath, folder) {
   const stat = fs.statSync(filePath);
 
+  if (folder === 'videos') {
+    console.log(`Video file (${(stat.size / 1024 / 1024).toFixed(1)} MB) -> GitHub Releases API`);
+    return {
+      url: await uploadLargeFile(filePath, folder),
+      local: false,
+    };
+  }
+
   if (stat.size <= MAX_CONTENT_SIZE) {
     return {
       url: await uploadSmallFile(filePath, folder),
