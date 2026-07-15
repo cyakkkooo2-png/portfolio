@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
-import { getWorks } from '../api';
+import { useEffect, useMemo, useState } from 'react';
+import { getWorks, reorderWorks } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 
+const FEATURED_LIMIT = 6;
+
 const FILTERS = [
-  { k: '', l: '全部', icon: 'grid' },
+  { k: 'featured', l: '精选', icon: 'spark' },
+  { k: 'all', l: '全部', icon: 'grid' },
   { k: 'video', l: '视频', icon: 'video' },
   { k: 'image', l: '图片', icon: 'image' },
   { k: 'article', l: '文章', icon: 'article' },
@@ -30,6 +34,16 @@ function FilterIcon({ type, active, color }) {
     strokeLinecap: 'round',
     strokeLinejoin: 'round',
   };
+
+  if (type === 'spark') {
+    return (
+      <svg {...common}>
+        <path d="M12 3.8 13.7 9l5.5 1.1-5.1 2.5L12 18.2l-2.1-5.6-5.1-2.5L10.3 9 12 3.8Z" />
+        <path d="M19 4.5v3" />
+        <path d="M20.5 6h-3" />
+      </svg>
+    );
+  }
 
   if (type === 'grid') {
     return (
@@ -81,27 +95,77 @@ function SplitTitle({ value, fallback }) {
   return <>{text.slice(0, -2)}<span style={{ color: '#ff6600' }}>{text.slice(-2)}</span></>;
 }
 
+function moveItem(list, from, to) {
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
 export default function WorksGrid({ onSelectWork }) {
   const t = useTheme();
+  const { user } = useAuth() || {};
   const [works, setWorks] = useState([]);
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useState('featured');
   const [videoCategory, setVideoCategory] = useState('');
   const [loading, setLoading] = useState(true);
+  const [dragId, setDragId] = useState('');
+  const [dropId, setDropId] = useState('');
+  const [savingOrder, setSavingOrder] = useState(false);
   const acc = t?.accentColor || '#ff6600';
+  const canArrange = Boolean(user);
 
   useEffect(() => {
     setLoading(true);
-    getWorks(filter || undefined).then((data) => setWorks(data.works || [])).finally(() => setLoading(false));
-  }, [filter]);
+    getWorks().then((data) => setWorks(data.works || [])).finally(() => setLoading(false));
+  }, []);
 
-  const videoCategories = [...new Set(
+  const videoCategories = useMemo(() => [...new Set(
     works
       .filter((work) => work.type === 'video' && work.category)
       .map((work) => work.category)
-  )];
-  const visibleWorks = filter === 'video' && videoCategory
-    ? works.filter((work) => work.category === videoCategory)
-    : works;
+  )], [works]);
+
+  const visibleWorks = useMemo(() => {
+    let list = works;
+    if (filter === 'featured') list = list.slice(0, FEATURED_LIMIT);
+    if (filter === 'video') list = list.filter((work) => work.type === 'video');
+    if (filter === 'image') list = list.filter((work) => work.type === 'image');
+    if (filter === 'article') list = list.filter((work) => work.type === 'article');
+    if (filter === 'video' && videoCategory) list = list.filter((work) => work.category === videoCategory);
+    return list;
+  }, [filter, videoCategory, works]);
+
+  async function saveOrder(nextWorks) {
+    setSavingOrder(true);
+    setWorks(nextWorks);
+    try {
+      const data = await reorderWorks(nextWorks.map((work) => work.id));
+      setWorks(data.works || nextWorks);
+    } catch (err) {
+      alert(err.message || '保存排序失败');
+      getWorks().then((data) => setWorks(data.works || []));
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
+  function reorderVisible(targetId) {
+    if (!canArrange || !dragId || dragId === targetId || savingOrder) return;
+    const visibleIds = visibleWorks.map((work) => work.id);
+    const fromVisible = visibleIds.indexOf(dragId);
+    const toVisible = visibleIds.indexOf(targetId);
+    if (fromVisible < 0 || toVisible < 0) return;
+
+    const reorderedVisibleIds = moveItem(visibleIds, fromVisible, toVisible);
+    let cursor = 0;
+    const nextWorks = works.map((work) => (
+      visibleIds.includes(work.id)
+        ? works.find((item) => item.id === reorderedVisibleIds[cursor++])
+        : work
+    ));
+    saveOrder(nextWorks);
+  }
 
   return (
     <section id="work" className="relative px-6 py-24 md:px-20" style={{ background: '#fff' }}>
@@ -111,6 +175,11 @@ export default function WorksGrid({ onSelectWork }) {
             <SplitTitle value={t?.worksTitle} fallback="精选作品" />
           </h2>
           <RichText as="p" value={t?.worksSubtitle} fallback="Selected works across video, image and writing" className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }} />
+          {canArrange && (
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-600">
+              <span>{savingOrder ? '正在保存排序…' : '已登录：拖动作品卡片左上角手柄即可排序，前 6 个会显示在精选'}</span>
+            </div>
+          )}
         </div>
 
         <div className="mt-16 flex flex-wrap items-center justify-center gap-3">
@@ -170,9 +239,51 @@ export default function WorksGrid({ onSelectWork }) {
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               {visibleWorks.map((work) => (
-                <article key={work.id} className="group relative aspect-video cursor-pointer overflow-hidden rounded-2xl transition-transform hover:-translate-y-1" style={{ background: '#0f1322', boxShadow: '0 28px 55px rgba(15,19,34,0.14)' }} onClick={() => onSelectWork?.(work)}>
+                <article
+                  key={work.id}
+                  draggable={canArrange}
+                  onDragStart={(event) => {
+                    if (!canArrange) return;
+                    setDragId(work.id);
+                    event.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onDragOver={(event) => {
+                    if (!canArrange || !dragId) return;
+                    event.preventDefault();
+                    setDropId(work.id);
+                  }}
+                  onDragLeave={() => setDropId('')}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    reorderVisible(work.id);
+                    setDragId('');
+                    setDropId('');
+                  }}
+                  onDragEnd={() => {
+                    setDragId('');
+                    setDropId('');
+                  }}
+                  className={`group relative aspect-video cursor-pointer overflow-hidden rounded-2xl transition-transform hover:-translate-y-1 ${dropId === work.id ? 'ring-4 ring-orange-300' : ''} ${dragId === work.id ? 'opacity-60' : ''}`}
+                  style={{ background: '#0f1322', boxShadow: '0 28px 55px rgba(15,19,34,0.14)' }}
+                  onClick={() => {
+                    if (dragId) return;
+                    onSelectWork?.(work);
+                  }}
+                >
                   {work.type === 'image' && work.file_path ? <img src={assetUrl(work.file_path)} alt={work.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" /> : work.thumbnail ? <img src={assetUrl(work.thumbnail)} alt={work.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" /> : null}
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0.08) 0%, rgba(6,8,18,0.92) 100%)' }} />
+                  {canArrange && (
+                    <div
+                      className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-gray-700 shadow-lg backdrop-blur"
+                      title="按住拖动排序"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <span className="grid h-4 w-4 grid-cols-2 gap-0.5">
+                        {Array.from({ length: 4 }).map((_, index) => <i key={index} className="rounded-sm bg-orange-500" />)}
+                      </span>
+                      拖动
+                    </div>
+                  )}
                   <div className="absolute bottom-7 left-7 right-7">
                     <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ background: 'rgba(255,255,255,0.14)' }}>
                       <FilterIcon type={ICONS[work.type] || 'article'} active color="#fff" />
