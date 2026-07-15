@@ -1,4 +1,4 @@
-import { RichText, useTheme } from '../context/ThemeContext';
+import { RichText, fnt, useTheme } from '../context/ThemeContext';
 
 function ChipIcon({ type, color }) {
   const common = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -36,7 +36,7 @@ export default function Hero() {
           value={t?.heroTitle}
           fallback="创意.空间"
           className="mt-8 text-white"
-          style={{ fontFamily: "'Playfair Display', 'Noto Serif SC', serif", fontSize: 'clamp(56px, 6vw, 86px)', fontWeight: 900, lineHeight: 1.05 }}
+          style={{ ...fnt(t?.heroTitle, 'Playfair Display', 72, '#ffffff'), lineHeight: 1.05 }}
         />
 
         <RichText

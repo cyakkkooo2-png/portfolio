@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RichText, txt, useTheme } from '../context/ThemeContext';
+import { RichText, fnt, txt, useTheme } from '../context/ThemeContext';
 
 function SplitTitle({ value, fallback }) {
   const text = txt(value, fallback);
@@ -24,7 +24,7 @@ export default function Contact() {
     <section id="contact" className="relative px-6 py-28 md:px-20" style={{ background: '#fff' }}>
       <div className="mx-auto max-w-5xl">
         <div className="text-center">
-          <h2 className="text-gray-900" style={{ fontFamily: "'Playfair Display', 'Noto Serif SC', serif", fontSize: 'clamp(42px, 4vw, 58px)', fontWeight: 900, lineHeight: 1.1 }}>
+          <h2 className="text-gray-900" style={{ ...fnt(t?.contactTitle, 'Playfair Display', 48, '#111111'), lineHeight: 1.1 }}>
             <SplitTitle value={t?.contactTitle} fallback="联系合作" />
           </h2>
           <RichText as="p" value={t?.contactSubtitle} fallback="Get in Touch" className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }} />
