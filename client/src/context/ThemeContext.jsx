@@ -18,7 +18,6 @@ export function txt(val, fallback) {
 }
 
 export function fnt(val, df, ds, dc) {
-  const hasStyle = typeof val === 'object' && val;
   const family = (typeof val === 'object' && val?.font) || df || 'Inter';
   const size = (typeof val === 'object' && val?.size) || ds || 16;
   const color = (typeof val === 'object' && val?.color) || dc || '#111';
@@ -26,7 +25,7 @@ export function fnt(val, df, ds, dc) {
     fontFamily: `"${family}"`,
     fontSize: `${size}px`,
     color,
-    ...(hasStyle ? { fontWeight: val?.bold ? 700 : 400 } : {}),
+    ...(val?.bold ? { fontWeight: 700 } : {}),
     ...(val?.italic ? { fontStyle: 'italic' } : {}),
     ...(val?.underline ? { textDecoration: 'underline' } : {}),
   };
@@ -41,7 +40,7 @@ export function RichText({ value, fallback, className = '', style = {}, as: Tag 
     ...(base.font ? { fontFamily: `"${base.font}"` } : {}),
     ...(base.size ? { fontSize: `${base.size}px` } : {}),
     ...(base.color ? { color: base.color } : {}),
-    ...(typeof value === 'object' && value ? { fontWeight: base.bold ? 700 : 400 } : {}),
+    ...(base.bold ? { fontWeight: 700 } : {}),
     ...(base.italic ? { fontStyle: 'italic' } : {}),
     ...(base.underline ? { textDecoration: 'underline' } : {}),
     ...style,
