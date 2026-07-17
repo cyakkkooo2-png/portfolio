@@ -136,8 +136,10 @@ export default function WorksGrid({ onSelectWork }) {
   const [loading, setLoading] = useState(true);
   const [savingOrder, setSavingOrder] = useState(false);
   const [selectedMoveId, setSelectedMoveId] = useState('');
+  const [arrangeMode, setArrangeMode] = useState(false);
   const acc = t?.accentColor || '#ff6600';
-  const canArrange = Boolean(user);
+  const isLoggedIn = Boolean(user);
+  const canArrange = isLoggedIn && arrangeMode;
 
   useEffect(() => {
     setLoading(true);
@@ -225,9 +227,24 @@ export default function WorksGrid({ onSelectWork }) {
             <SplitTitle value={t?.worksTitle} fallback="部分作品" />
           </h2>
           <RichText as="p" value={t?.worksSubtitle} fallback="Selected works across video, image and writing" className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }} />
-          {canArrange && (
-            <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-600">
-              <span>{savingOrder ? '正在保存排序…' : selectedMoveId ? '已选中作品：再点击目标作品，即可移动过去；点同一张可取消' : '已登录：点击要移动的作品，再点击目标位置，前 9 个会显示在精选'}</span>
+          {isLoggedIn && (
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setArrangeMode((value) => !value);
+                  setSelectedMoveId('');
+                }}
+                className="rounded-full px-4 py-2 text-xs font-semibold transition"
+                style={arrangeMode ? { background: acc, color: '#fff', boxShadow: `0 12px 24px ${acc}24` } : { background: '#f7f8fb', color: '#6b7280' }}
+              >
+                {arrangeMode ? '退出排序模式' : '开启排序模式'}
+              </button>
+              {arrangeMode && (
+                <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-600">
+                  <span>{savingOrder ? '正在保存排序…' : selectedMoveId ? '已选中作品：再点击目标作品即可移动；点击同一张可取消' : '排序模式：先点要移动的作品，再点目标位置；前 9 个会显示在精选'}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -241,6 +258,7 @@ export default function WorksGrid({ onSelectWork }) {
                 onClick={() => {
                   setFilter(item.k);
                   setVideoCategory('');
+                  setSelectedMoveId('');
                 }}
                 className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-all"
                 style={active ? { background: acc, color: '#fff', boxShadow: `0 12px 24px ${acc}30` } : { background: '#f7f8fb', color: '#8f96a3' }}
