@@ -137,9 +137,12 @@ export default function WorksGrid({ onSelectWork }) {
   const [savingOrder, setSavingOrder] = useState(false);
   const [selectedMoveId, setSelectedMoveId] = useState('');
   const [arrangeMode, setArrangeMode] = useState(false);
+  const [selectedWorkIds, setSelectedWorkIds] = useState([]);
+  const [batchSaving, setBatchSaving] = useState(false);
   const acc = t?.accentColor || '#ff6600';
   const isLoggedIn = Boolean(user);
   const canArrange = isLoggedIn && arrangeMode;
+  const selectedWorkSet = useMemo(() => new Set(selectedWorkIds), [selectedWorkIds]);
 
   useEffect(() => {
     setLoading(true);
@@ -161,6 +164,12 @@ export default function WorksGrid({ onSelectWork }) {
     if (filter === 'video' && videoCategory) list = list.filter((work) => work.category === videoCategory);
     return list;
   }, [filter, videoCategory, works]);
+
+  const visibleWorkIds = useMemo(() => visibleWorks.map((work) => work.id), [visibleWorks]);
+  const selectedVisibleCount = useMemo(
+    () => visibleWorkIds.filter((id) => selectedWorkSet.has(id)).length,
+    [selectedWorkSet, visibleWorkIds]
+  );
 
   async function saveOrder(nextWorks) {
     const safeWorks = nextWorks.filter((work) => work && work.id);
@@ -240,6 +249,48 @@ export default function WorksGrid({ onSelectWork }) {
     }
   }
 
+  function toggleSelectedWork(event, workId) {
+    event.stopPropagation();
+    setSelectedWorkIds((current) => (
+      current.includes(workId)
+        ? current.filter((id) => id !== workId)
+        : [...current, workId]
+    ));
+  }
+
+  function selectAllVisible() {
+    setSelectedWorkIds((current) => [...new Set([...current, ...visibleWorkIds])]);
+  }
+
+  function clearSelectedWorks() {
+    setSelectedWorkIds([]);
+  }
+
+  async function batchSetVisibility(hidden) {
+    const ids = selectedWorkIds.filter((id) => works.some((work) => work.id === id));
+    if (!ids.length || batchSaving) return;
+
+    const previousWorks = works;
+    setBatchSaving(true);
+    setWorks((current) => current.map((work) => (
+      ids.includes(work.id) ? { ...work, hidden } : work
+    )));
+
+    try {
+      const results = await Promise.all(ids.map((id) => toggleWorkVisibility(id, hidden)));
+      setWorks((current) => current.map((work) => {
+        const updated = results.find((result) => result.work?.id === work.id)?.work;
+        return updated ? { ...work, ...updated } : work;
+      }));
+      setSelectedWorkIds([]);
+    } catch (err) {
+      setWorks(previousWorks);
+      alert(err.message || '批量修改失败');
+    } finally {
+      setBatchSaving(false);
+    }
+  }
+
   return (
     <section id="work" className="relative px-6 py-24 md:px-20" style={{ background: '#fff' }}>
       <div className="mx-auto max-w-6xl">
@@ -264,6 +315,49 @@ export default function WorksGrid({ onSelectWork }) {
               {arrangeMode && (
                 <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-600">
                   <span>{savingOrder ? '正在保存排序…' : selectedMoveId ? '已选中作品：再点击目标作品即可移动；点击同一张可取消' : '排序模式：先点要移动的作品，再点目标位置；前 9 个会显示在精选'}</span>
+                </div>
+              )}
+              {!arrangeMode && (
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={selectAllVisible}
+                    className="rounded-full bg-gray-900 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 disabled:opacity-45"
+                    disabled={!visibleWorkIds.length || batchSaving}
+                  >
+                    全选当前
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearSelectedWorks}
+                    className="rounded-full bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-600 transition hover:-translate-y-0.5 disabled:opacity-45"
+                    disabled={!selectedWorkIds.length || batchSaving}
+                  >
+                    全不选
+                  </button>
+                  {selectedWorkIds.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => batchSetVisibility(true)}
+                        className="rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-600 transition hover:-translate-y-0.5 disabled:opacity-45"
+                        disabled={batchSaving}
+                      >
+                        批量隐藏
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => batchSetVisibility(false)}
+                        className="rounded-full bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-600 transition hover:-translate-y-0.5 disabled:opacity-45"
+                        disabled={batchSaving}
+                      >
+                        批量显示
+                      </button>
+                      <span className="rounded-full bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-600">
+                        已选 {selectedVisibleCount || selectedWorkIds.length} 个
+                      </span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -331,7 +425,7 @@ export default function WorksGrid({ onSelectWork }) {
                 <article
                   key={work.id}
                   data-work-card={work.id}
-                  className={`group relative aspect-video select-none overflow-hidden rounded-2xl transition-transform hover:-translate-y-1 ${canArrange ? 'cursor-pointer' : 'cursor-pointer'} ${selectedMoveId === work.id ? 'ring-4 ring-orange-400' : selectedMoveId ? 'ring-2 ring-dashed ring-orange-200' : ''} ${work.hidden ? 'ring-2 ring-dashed ring-gray-300' : ''}`}
+                  className={`group relative aspect-video select-none overflow-hidden rounded-2xl transition-transform hover:-translate-y-1 ${canArrange ? 'cursor-pointer' : 'cursor-pointer'} ${selectedMoveId === work.id ? 'ring-4 ring-orange-400' : selectedMoveId ? 'ring-2 ring-dashed ring-orange-200' : ''} ${work.hidden ? 'ring-2 ring-dashed ring-gray-300' : ''} ${selectedWorkSet.has(work.id) ? 'ring-4 ring-blue-400' : ''}`}
                   style={{ background: '#0f1322', boxShadow: work.hidden ? '0 18px 36px rgba(15,19,34,0.08)' : '0 28px 55px rgba(15,19,34,0.14)' }}
                   onClick={() => handleWorkClick(work)}
                 >
@@ -346,6 +440,17 @@ export default function WorksGrid({ onSelectWork }) {
                       title={work.hidden ? '让游客重新看到这个作品' : '隐藏后游客看不到，登录后仍可管理'}
                     >
                       {work.hidden ? '显示' : '隐藏'}
+                    </button>
+                  )}
+                  {isLoggedIn && !canArrange && (
+                    <button
+                      type="button"
+                      onClick={(event) => toggleSelectedWork(event, work.id)}
+                      className="absolute right-4 top-4 z-20 flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105"
+                      style={selectedWorkSet.has(work.id) ? { background: '#2563eb', color: '#fff' } : { background: 'rgba(255,255,255,0.95)', color: '#4b5563' }}
+                      title="选择作品用于批量隐藏或显示"
+                    >
+                      {selectedWorkSet.has(work.id) ? '✓' : '选'}
                     </button>
                   )}
                   {canArrange && (
