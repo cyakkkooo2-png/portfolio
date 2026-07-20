@@ -67,6 +67,13 @@ export function reorderWorks(ids) {
   });
 }
 
+export function toggleWorkVisibility(id, hidden) {
+  return request(`/works/${id}/visibility`, {
+    method: 'PATCH',
+    body: JSON.stringify({ hidden }),
+  });
+}
+
 export function migrateLocalVideos() {
   return request('/works/migrate-local-videos', {
     method: 'POST',

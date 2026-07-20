@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { Readable } = require('stream');
 const db = require('../db/database');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, optionalAuthMiddleware } = require('../middleware/auth');
 const githubStorage = require('../github-storage');
 const cosStorage = require('../cos-storage');
 const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
@@ -542,10 +542,15 @@ function rejectDuplicate(res, duplicate) {
   return true;
 }
 
+function filterPublicWorks(works, req) {
+  if (req.user) return works;
+  return works.filter((work) => !work.hidden);
+}
+
 // GET /api/works
-router.get('/', (req, res) => {
+router.get('/', optionalAuthMiddleware, (req, res) => {
   const works = db.getWorks({ type: req.query.type, category: req.query.category });
-  res.json({ works });
+  res.json({ works: filterPublicWorks(works, req) });
 });
 
 router.put('/reorder', authMiddleware, (req, res) => {
@@ -553,6 +558,15 @@ router.put('/reorder', authMiddleware, (req, res) => {
   if (!ids.length) return res.status(400).json({ error: '请提供作品排序列表' });
   const works = db.reorderWorks(ids);
   res.json({ works });
+});
+
+router.patch('/:id/visibility', authMiddleware, (req, res) => {
+  const existing = db.getWorkById(req.params.id);
+  if (!existing) return res.status(404).json({ error: '作品不存在' });
+
+  const hidden = Boolean(req.body?.hidden);
+  const work = db.updateWork(req.params.id, { hidden });
+  res.json({ work });
 });
 
 router.delete('/cleanup-local-videos', authMiddleware, (req, res) => {
@@ -721,9 +735,9 @@ router.get('/proxy-image', async (req, res) => {
 });
 
 // GET /api/works/:id
-router.get('/:id', (req, res) => {
+router.get('/:id', optionalAuthMiddleware, (req, res) => {
   const work = db.getWorkById(req.params.id);
-  if (!work) return res.status(404).json({ error: '作品不存在' });
+  if (!work || (!req.user && work.hidden)) return res.status(404).json({ error: '作品不存在' });
   res.json({ work });
 });
 

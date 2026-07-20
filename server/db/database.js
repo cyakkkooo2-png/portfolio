@@ -60,6 +60,7 @@ function createWork(data) {
     external_url: data.external_url || '',
     tags: data.tags || [],
     category: data.type === 'video' ? (data.category || '') : '',
+    hidden: Boolean(data.hidden),
     order: maxOrder + 1,
     created_at: new Date().toISOString(),
   };

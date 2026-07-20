@@ -18,4 +18,17 @@ function authMiddleware(req, res, next) {
   }
 }
 
-module.exports = { authMiddleware, JWT_SECRET };
+function optionalAuthMiddleware(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return next();
+
+  const token = header.split(' ')[1];
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+  } catch {
+    req.user = null;
+  }
+  next();
+}
+
+module.exports = { authMiddleware, optionalAuthMiddleware, JWT_SECRET };

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getWorks, reorderWorks } from '../api';
+import { getWorks, reorderWorks, toggleWorkVisibility } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 
@@ -219,6 +219,27 @@ export default function WorksGrid({ onSelectWork }) {
     reorderVisible(sourceId, work.id);
   }
 
+  async function handleToggleVisibility(event, work) {
+    event.stopPropagation();
+    const nextHidden = !work.hidden;
+    const previousWorks = works;
+    setWorks((current) => current.map((item) => (
+      item.id === work.id ? { ...item, hidden: nextHidden } : item
+    )));
+
+    try {
+      const data = await toggleWorkVisibility(work.id, nextHidden);
+      if (data.work) {
+        setWorks((current) => current.map((item) => (
+          item.id === work.id ? { ...item, ...data.work } : item
+        )));
+      }
+    } catch (err) {
+      setWorks(previousWorks);
+      alert(err.message || '修改显示状态失败');
+    }
+  }
+
   return (
     <section id="work" className="relative px-6 py-24 md:px-20" style={{ background: '#fff' }}>
       <div className="mx-auto max-w-6xl">
@@ -310,12 +331,23 @@ export default function WorksGrid({ onSelectWork }) {
                 <article
                   key={work.id}
                   data-work-card={work.id}
-                  className={`group relative aspect-video select-none overflow-hidden rounded-2xl transition-transform hover:-translate-y-1 ${canArrange ? 'cursor-pointer' : 'cursor-pointer'} ${selectedMoveId === work.id ? 'ring-4 ring-orange-400' : selectedMoveId ? 'ring-2 ring-dashed ring-orange-200' : ''}`}
-                  style={{ background: '#0f1322', boxShadow: '0 28px 55px rgba(15,19,34,0.14)' }}
+                  className={`group relative aspect-video select-none overflow-hidden rounded-2xl transition-transform hover:-translate-y-1 ${canArrange ? 'cursor-pointer' : 'cursor-pointer'} ${selectedMoveId === work.id ? 'ring-4 ring-orange-400' : selectedMoveId ? 'ring-2 ring-dashed ring-orange-200' : ''} ${work.hidden ? 'ring-2 ring-dashed ring-gray-300' : ''}`}
+                  style={{ background: '#0f1322', boxShadow: work.hidden ? '0 18px 36px rgba(15,19,34,0.08)' : '0 28px 55px rgba(15,19,34,0.14)' }}
                   onClick={() => handleWorkClick(work)}
                 >
-                  {work.type === 'image' && work.file_path ? <img src={assetUrl(work.file_path)} alt={work.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" /> : work.thumbnail ? <img src={assetUrl(work.thumbnail)} alt={work.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" /> : null}
+                  {work.type === 'image' && work.file_path ? <img src={assetUrl(work.file_path)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-45 grayscale' : ''}`} loading="lazy" /> : work.thumbnail ? <img src={assetUrl(work.thumbnail)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-45 grayscale' : ''}`} loading="lazy" /> : null}
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0.08) 0%, rgba(6,8,18,0.92) 100%)' }} />
+                  {isLoggedIn && (
+                    <button
+                      type="button"
+                      onClick={(event) => handleToggleVisibility(event, work)}
+                      className="absolute right-4 top-4 z-20 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105"
+                      style={{ color: work.hidden ? '#16a34a' : '#4b5563' }}
+                      title={work.hidden ? '让游客重新看到这个作品' : '隐藏后游客看不到，登录后仍可管理'}
+                    >
+                      {work.hidden ? '显示' : '隐藏'}
+                    </button>
+                  )}
                   {canArrange && (
                     <div
                       className="absolute left-4 top-4 z-10 flex select-none items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-gray-700 shadow-lg backdrop-blur"
@@ -328,6 +360,11 @@ export default function WorksGrid({ onSelectWork }) {
                     </div>
                   )}
                   <div className="absolute bottom-7 left-7 right-7">
+                    {work.hidden && (
+                      <div className="mb-3 inline-flex rounded-full bg-black/45 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+                        已隐藏：游客不可见
+                      </div>
+                    )}
                     <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ background: 'rgba(255,255,255,0.14)' }}>
                       <FilterIcon type={ICONS[work.type] || 'article'} active color="#fff" />
                       {work.type === 'video' && work.category ? work.category : (LABELS[work.type] || work.type)}
