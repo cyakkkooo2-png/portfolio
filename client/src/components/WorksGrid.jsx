@@ -425,68 +425,77 @@ export default function WorksGrid({ onSelectWork }) {
                 <article
                   key={work.id}
                   data-work-card={work.id}
-                  className={`group relative aspect-video select-none overflow-hidden rounded-2xl transition-transform hover:-translate-y-1 ${canArrange ? 'cursor-pointer' : 'cursor-pointer'} ${selectedMoveId === work.id ? 'ring-4 ring-orange-400' : selectedMoveId ? 'ring-2 ring-dashed ring-orange-200' : ''} ${work.hidden ? 'ring-2 ring-dashed ring-gray-300' : ''} ${selectedWorkSet.has(work.id) ? 'ring-4 ring-blue-400' : ''}`}
-                  style={{ background: '#0f1322', boxShadow: work.hidden ? '0 18px 36px rgba(15,19,34,0.08)' : '0 28px 55px rgba(15,19,34,0.14)' }}
+                  className={`group relative select-none rounded-2xl transition-transform hover:-translate-y-1 ${canArrange ? 'cursor-pointer' : 'cursor-pointer'} ${selectedMoveId === work.id ? 'ring-4 ring-orange-400' : selectedMoveId ? 'ring-2 ring-dashed ring-orange-200' : ''} ${work.hidden ? 'ring-2 ring-dashed ring-gray-300' : ''} ${selectedWorkSet.has(work.id) ? 'ring-4 ring-blue-400' : ''}`}
                   onClick={() => handleWorkClick(work)}
                 >
-                  {work.type === 'image' && work.file_path ? <img src={assetUrl(work.file_path)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-45 grayscale' : ''}`} loading="lazy" /> : work.thumbnail ? <img src={assetUrl(work.thumbnail)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-45 grayscale' : ''}`} loading="lazy" /> : null}
-                  <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0.08) 0%, rgba(6,8,18,0.92) 100%)' }} />
-                  {isLoggedIn && !canArrange && (
-                    <button
-                      type="button"
-                      onClick={(event) => handleToggleVisibility(event, work)}
-                      className="absolute left-4 top-4 z-20 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105"
-                      style={{ color: work.hidden ? '#16a34a' : '#4b5563' }}
-                      title={work.hidden ? '让游客重新看到这个作品' : '隐藏后游客看不到，登录后仍可管理'}
-                    >
-                      {work.hidden ? '显示' : '隐藏'}
-                    </button>
-                  )}
-                  {isLoggedIn && !canArrange && (
-                    <button
-                      type="button"
-                      onClick={(event) => toggleSelectedWork(event, work.id)}
-                      className="absolute right-4 top-4 z-20 flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105"
-                      style={selectedWorkSet.has(work.id) ? { background: '#2563eb', color: '#fff' } : { background: 'rgba(255,255,255,0.95)', color: '#4b5563' }}
-                      title="选择作品用于批量隐藏或显示"
-                    >
-                      {selectedWorkSet.has(work.id) ? '✓' : '选'}
-                    </button>
-                  )}
-                  {canArrange && (
-                    <div
-                      className="absolute left-4 top-4 z-10 flex select-none items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-gray-700 shadow-lg backdrop-blur"
-                      title="点击选择，再点击目标位置排序"
-                    >
-                      <span className="grid h-4 w-4 grid-cols-2 gap-0.5">
-                        {Array.from({ length: 4 }).map((_, index) => <i key={index} className="rounded-sm bg-orange-500" />)}
-                      </span>
-                      {selectedMoveId === work.id ? '已选中' : '点击移动'}
-                    </div>
-                  )}
-                  <div className="absolute bottom-7 left-7 right-7">
-                    {work.hidden && (
-                      <div className="mb-3 inline-flex rounded-full bg-black/45 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                        已隐藏：游客不可见
+                  <div
+                    className="relative aspect-video overflow-hidden rounded-2xl"
+                    style={{ background: '#0f1322', boxShadow: work.hidden ? '0 18px 36px rgba(15,19,34,0.08)' : '0 24px 48px rgba(15,19,34,0.12)' }}
+                  >
+                    {work.type === 'image' && work.file_path ? <img src={assetUrl(work.file_path)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" /> : work.thumbnail ? <img src={assetUrl(work.thumbnail)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" /> : null}
+                    <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0) 0%, rgba(6,8,18,0.04) 48%, rgba(6,8,18,0.24) 100%)' }} />
+                    {isLoggedIn && !canArrange && (
+                      <button
+                        type="button"
+                        onClick={(event) => handleToggleVisibility(event, work)}
+                        className="absolute left-4 top-4 z-20 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105"
+                        style={{ color: work.hidden ? '#16a34a' : '#4b5563' }}
+                        title={work.hidden ? '让游客重新看到这个作品' : '隐藏后游客看不到，登录后仍可管理'}
+                      >
+                        {work.hidden ? '显示' : '隐藏'}
+                      </button>
+                    )}
+                    {isLoggedIn && !canArrange && (
+                      <button
+                        type="button"
+                        onClick={(event) => toggleSelectedWork(event, work.id)}
+                        className="absolute right-4 top-4 z-20 flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105"
+                        style={selectedWorkSet.has(work.id) ? { background: '#2563eb', color: '#fff' } : { background: 'rgba(255,255,255,0.95)', color: '#4b5563' }}
+                        title="选择作品用于批量隐藏或显示"
+                      >
+                        {selectedWorkSet.has(work.id) ? '✓' : '选'}
+                      </button>
+                    )}
+                    {canArrange && (
+                      <div
+                        className="absolute left-4 top-4 z-10 flex select-none items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-gray-700 shadow-lg backdrop-blur"
+                        title="点击选择，再点击目标位置排序"
+                      >
+                        <span className="grid h-4 w-4 grid-cols-2 gap-0.5">
+                          {Array.from({ length: 4 }).map((_, index) => <i key={index} className="rounded-sm bg-orange-500" />)}
+                        </span>
+                        {selectedMoveId === work.id ? '已选中' : '点击移动'}
                       </div>
                     )}
-                    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ background: 'rgba(255,255,255,0.14)' }}>
+                    <span className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur" style={{ background: 'rgba(0,0,0,0.34)' }}>
                       <FilterIcon type={ICONS[work.type] || 'article'} active color="#fff" />
                       {work.type === 'video' && work.category ? work.category : (LABELS[work.type] || work.type)}
                     </span>
+                    <div className="absolute bottom-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-lg text-white opacity-0 transition-opacity group-hover:opacity-100" style={{ background: acc }}>→</div>
+                  </div>
+
+                  <div className="mt-3 px-1">
                     <h3
-                      className="mt-4 overflow-hidden text-xl font-bold leading-tight text-white"
+                      className="overflow-hidden text-lg font-bold leading-snug text-gray-950"
                       style={{
                         display: '-webkit-box',
                         WebkitBoxOrient: 'vertical',
                         WebkitLineClamp: 2,
-                        textShadow: '0 2px 14px rgba(0,0,0,0.45)',
                       }}
                     >
                       {work.title}
                     </h3>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-400">
+                      {work.hidden && (
+                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600">
+                          已隐藏：游客不可见
+                        </span>
+                      )}
+                      {work.type === 'video' && work.category && (
+                        <span>{work.category}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full text-xl text-white opacity-0 transition-opacity group-hover:opacity-100" style={{ background: acc }}>→</div>
                 </article>
               ))}
             </div>
