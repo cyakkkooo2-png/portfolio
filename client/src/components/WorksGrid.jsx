@@ -337,11 +337,11 @@ export default function WorksGrid({ onSelectWork }) {
                 >
                   {work.type === 'image' && work.file_path ? <img src={assetUrl(work.file_path)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-45 grayscale' : ''}`} loading="lazy" /> : work.thumbnail ? <img src={assetUrl(work.thumbnail)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-45 grayscale' : ''}`} loading="lazy" /> : null}
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0.08) 0%, rgba(6,8,18,0.92) 100%)' }} />
-                  {isLoggedIn && (
+                  {isLoggedIn && !canArrange && (
                     <button
                       type="button"
                       onClick={(event) => handleToggleVisibility(event, work)}
-                      className="absolute right-4 top-4 z-20 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105"
+                      className="absolute left-4 top-4 z-20 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105"
                       style={{ color: work.hidden ? '#16a34a' : '#4b5563' }}
                       title={work.hidden ? '让游客重新看到这个作品' : '隐藏后游客看不到，登录后仍可管理'}
                     >
