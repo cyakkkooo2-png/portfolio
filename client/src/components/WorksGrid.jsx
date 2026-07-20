@@ -5,7 +5,7 @@ import { RichText, txt, useTheme } from '../context/ThemeContext';
 
 const FEATURED_LIMIT = 9;
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
-const WORK_CARD_TITLE_FONT = "'演示斜黑体', 'Yanshi Xieheiti', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
 
 const FILTERS = [
   { k: 'featured', l: '精选', icon: 'spark' },
@@ -477,12 +477,13 @@ export default function WorksGrid({ onSelectWork }) {
 
                   <div className="mt-3 px-1">
                     <h3
-                      className="overflow-hidden text-base font-normal leading-snug text-gray-950"
+                      className="overflow-hidden text-base font-semibold leading-snug"
                       style={{
                         display: '-webkit-box',
                         WebkitBoxOrient: 'vertical',
                         WebkitLineClamp: 2,
                         fontFamily: WORK_CARD_TITLE_FONT,
+                        color: '#061827',
                       }}
                     >
                       {work.title}
