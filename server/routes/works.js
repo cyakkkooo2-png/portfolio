@@ -436,8 +436,14 @@ async function extractFromUrl(inputUrl, options = {}) {
 async function uploadToStorage(tmpPath, folder, filename) {
   if (folder === 'videos') {
     const uploadErrors = [];
+    const hasGithubStorage = Boolean(process.env.GITHUB_TOKEN);
+    const hasCosStorage = Boolean(process.env.COS_SECRET_ID);
 
-    if (process.env.GITHUB_TOKEN) {
+    if (!hasGithubStorage && !hasCosStorage) {
+      throw new Error('未配置外部视频存储。为避免占满 Railway 磁盘，视频不会再保存到 /data/uploads；请先配置 GITHUB_TOKEN 或 COS_SECRET_ID 后再上传。');
+    }
+
+    if (hasGithubStorage) {
       try {
         const result = await githubStorage.uploadFile(tmpPath, folder);
         if (!result.local) return result.url;
@@ -447,7 +453,7 @@ async function uploadToStorage(tmpPath, folder, filename) {
       }
     }
 
-    if (process.env.COS_SECRET_ID) {
+    if (hasCosStorage) {
       try {
         return await cosStorage.uploadFile(tmpPath, folder);
       } catch (err) {
@@ -456,13 +462,7 @@ async function uploadToStorage(tmpPath, folder, filename) {
       }
     }
 
-    if (process.env.COS_SECRET_ID || process.env.GITHUB_TOKEN) {
-      throw new Error(`视频外部存储上传失败，请稍后重试或检查存储配置。${uploadErrors.join('；')}`);
-    }
-
-    const localDest = path.join(UPLOADS_DIR, folder, filename);
-    fs.copyFileSync(tmpPath, localDest);
-    return `/uploads/videos/${filename}`;
+    throw new Error(`视频外部存储上传失败，已停止本地兜底保存，避免占满 Railway 磁盘。${uploadErrors.join('；')}`);
   }
 
   if (process.env.GITHUB_TOKEN) {
