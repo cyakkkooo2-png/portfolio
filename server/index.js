@@ -5,6 +5,7 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const db = require('./db/database');
 const { UPLOADS_DIR, ensureDir } = require('./paths');
+const vodStorage = require('./vod-storage');
 
 const authRoutes = require('./routes/auth');
 const worksRoutes = require('./routes/works');
@@ -29,7 +30,11 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/theme', themeRoutes);
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    time: new Date().toISOString(),
+    services: { vodUploadConfigured: vodStorage.isConfigured() },
+  });
 });
 
 const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
