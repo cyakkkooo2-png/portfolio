@@ -41,6 +41,17 @@ DOMAIN=ccyspace.icu bash deploy/tencent-lighthouse/setup-ubuntu.sh
 - `ALLOW_LOCAL_VIDEO_STORAGE=true`
 - `JWT_SECRET=自动生成`
 
+若要让网站后台上传的视频自动进入腾讯云点播，在生产环境中配置：
+
+```env
+TENCENT_VOD_SECRET_ID=腾讯云API密钥SecretId
+TENCENT_VOD_SECRET_KEY=腾讯云API密钥SecretKey
+TENCENT_VOD_SUB_APP_ID=1451500466
+TENCENT_VOD_API_REGION=ap-guangzhou
+```
+
+密钥只保存在服务器环境变量中，不能提交到 GitHub 或发送到浏览器。未配置时，视频上传会回退到现有存储方式。
+
 腾讯云持久化磁盘可直接保存视频，不要求配置 GitHub Token。若希望把视频额外保存到 GitHub，可在 `/var/www/ccyspace/server/.env.production` 里加入：
 
 ```env

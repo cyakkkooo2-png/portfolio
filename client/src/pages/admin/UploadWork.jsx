@@ -415,7 +415,7 @@ export default function UploadWork() {
 
         <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-1 text-base font-bold text-gray-900">作品上传</h2>
-          <p className="mb-5 text-sm text-gray-500">上传视频、图片或文章。</p>
+          <p className="mb-5 text-sm text-gray-500">上传视频、图片或文章。视频会优先保存到腾讯云点播并通过 CDN 播放。</p>
 
           {error && <div className="mb-5 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 

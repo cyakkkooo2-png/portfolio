@@ -2,10 +2,15 @@ import { useEffect, useState } from 'react';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
 
+function isTencentVodUrl(url = '') {
+  return /^https?:\/\/[^/]+\.(?:vod2\.myqcloud\.com|vod-qcloud\.com|vod\.tencent-cloud\.com)(?:\/|$)/i.test(url);
+}
+
 function assetUrl(url) {
   if (!url) return '';
   if (url.startsWith('//')) return `/api/works/proxy-image?url=${encodeURIComponent(`https:${url}`)}`;
   if (url.startsWith('/uploads/')) return url;
+  if (isTencentVodUrl(url)) return url;
   if (/^https?:\/\//i.test(url)) return `/api/works/proxy-image?url=${encodeURIComponent(url)}`;
   return url;
 }
@@ -13,6 +18,7 @@ function assetUrl(url) {
 function videoUrl(url) {
   if (!url) return '';
   if (url.startsWith('/uploads/')) return url;
+  if (isTencentVodUrl(url)) return url;
   if (/^https?:\/\//i.test(url)) return `/api/works/proxy-video?url=${encodeURIComponent(url)}`;
   return url;
 }

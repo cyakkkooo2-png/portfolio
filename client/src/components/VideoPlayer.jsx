@@ -1,6 +1,9 @@
 export default function VideoPlayer({ src, title }) {
+  const isTencentVod = /^https?:\/\/[^/]+\.(?:vod2\.myqcloud\.com|vod-qcloud\.com|vod\.tencent-cloud\.com)(?:\/|$)/i.test(src || '');
   const videoUrl = src?.startsWith('/uploads/')
     ? src
+    : isTencentVod
+      ? src
     : /^https?:\/\//i.test(src || '')
       ? `/api/works/proxy-video?url=${encodeURIComponent(src)}`
       : src;

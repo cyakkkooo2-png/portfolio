@@ -18,9 +18,14 @@ const FILTERS = [
 const LABELS = { video: '视频', image: '图片', article: '文章' };
 const ICONS = { video: 'video', image: 'image', article: 'article' };
 
+function isTencentVodUrl(url = '') {
+  return /^https?:\/\/[^/]+\.(?:vod2\.myqcloud\.com|vod-qcloud\.com|vod\.tencent-cloud\.com)(?:\/|$)/i.test(url);
+}
+
 function assetUrl(url) {
   if (!url) return '';
   if (url.startsWith('//')) return `/api/works/proxy-image?url=${encodeURIComponent(`https:${url}`)}`;
+  if (isTencentVodUrl(url)) return url;
   if (/^https?:\/\//i.test(url)) return `/api/works/proxy-image?url=${encodeURIComponent(url)}`;
   return url;
 }

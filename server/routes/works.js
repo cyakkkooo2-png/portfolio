@@ -7,6 +7,7 @@ const db = require('../db/database');
 const { authMiddleware, optionalAuthMiddleware } = require('../middleware/auth');
 const githubStorage = require('../github-storage');
 const cosStorage = require('../cos-storage');
+const vodStorage = require('../vod-storage');
 const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
 
 const router = express.Router();
@@ -550,6 +551,22 @@ function filterPublicWorks(works, req) {
   return works.filter((work) => !work.hidden);
 }
 
+async function uploadVideoToStorage(tmpPath, filename, options = {}) {
+  if (vodStorage.isConfigured()) {
+    try {
+      return await vodStorage.uploadFile(tmpPath, options);
+    } catch (err) {
+      console.error('Tencent VOD upload failed:', err.message);
+    }
+  }
+
+  return {
+    url: await uploadToStorage(tmpPath, 'videos', filename),
+    coverUrl: '',
+    fileId: '',
+  };
+}
+
 // GET /api/works
 router.get('/', optionalAuthMiddleware, (req, res) => {
   const works = db.getWorks({ type: req.query.type, category: req.query.category });
@@ -760,12 +777,18 @@ router.post('/', authMiddleware, upload.fields([
       originalName: incomingFile?.originalname,
     }))) return;
 
-    let filePath = '', thumbnail = '', totalFileSize = 0;
+    let filePath = '', thumbnail = '', vodFileId = '', totalFileSize = 0;
 
     if (req.files) {
       if (type === 'video' && req.files.video) {
         const f = req.files.video[0];
-        filePath = await uploadToStorage(f.path, 'videos', f.filename);
+        const uploaded = await uploadVideoToStorage(f.path, f.filename, {
+          mediaName: title,
+          coverFilePath: req.files.cover?.[0]?.path || '',
+        });
+        filePath = uploaded.url;
+        thumbnail = uploaded.coverUrl;
+        vodFileId = uploaded.fileId;
         totalFileSize += f.size || 0;
       } else if (type === 'image' && req.files.image) {
         const f = req.files.image[0];
@@ -776,7 +799,7 @@ router.post('/', authMiddleware, upload.fields([
         filePath = await uploadToStorage(f.path, 'documents', f.filename);
         totalFileSize += f.size || 0;
       }
-      if (req.files.cover) {
+      if (req.files.cover && !thumbnail) {
         const f = req.files.cover[0];
         thumbnail = await uploadToStorage(f.path, 'articles', f.filename);
         totalFileSize += f.size || 0;
@@ -786,6 +809,7 @@ router.post('/', authMiddleware, upload.fields([
     const work = db.createWork({
       title, description: description || '', type,
       file_path: filePath, content: content || '', thumbnail,
+      vod_file_id: vodFileId,
       tags: typeof tags === 'string' ? JSON.parse(tags) : (tags || []),
       category: type === 'video' ? String(category || '').trim().slice(0, 40) : '',
       file_size: totalFileSize || null,
@@ -870,7 +894,13 @@ router.put('/:id', authMiddleware, upload.fields([
       if (req.files.video) {
         await deleteFromStorage(existing.file_path);
         const f = req.files.video[0];
-        updateData.file_path = await uploadToStorage(f.path, 'videos', f.filename);
+        const uploaded = await uploadVideoToStorage(f.path, f.filename, {
+          mediaName: updateData.title || existing.title,
+          coverFilePath: req.files.cover?.[0]?.path || '',
+        });
+        updateData.file_path = uploaded.url;
+        updateData.vod_file_id = uploaded.fileId;
+        if (uploaded.coverUrl) updateData.thumbnail = uploaded.coverUrl;
         totalFileSize = f.size || 0;
       }
       if (req.files.image) {
@@ -885,7 +915,7 @@ router.put('/:id', authMiddleware, upload.fields([
         updateData.file_path = await uploadToStorage(f.path, 'documents', f.filename);
         totalFileSize = f.size || 0;
       }
-      if (req.files.cover) {
+      if (req.files.cover && !updateData.thumbnail) {
         await deleteFromStorage(existing.thumbnail);
         const f = req.files.cover[0];
         updateData.thumbnail = await uploadToStorage(f.path, 'articles', f.filename);
