@@ -1,6 +1,6 @@
 ---
 name: ccyspace-backup
-description: Back up the CCY SPACE portfolio project and task context to GitHub, or list saved task/version history. Use when the user says "备份", "备份当前版本", "备份这个版本", "备份任务", "备份对话记录", "查看历史任务", "列出历史任务", or asks to restore/list CCY SPACE portfolio backups.
+description: Back up the CCY SPACE portfolio project and task context to GitHub, or list and restore saved versions. Use when the user says "备份", "存档", "保存当前版本", "备份当前版本", "备份这个版本", "备份任务", "备份对话记录", "查看备份", "查看历史任务", "列出历史任务", or asks to restore a CCY SPACE backup.
 ---
 
 # CCYSPACE Backup
@@ -22,10 +22,11 @@ Use this skill for the CCY SPACE portfolio project at `cyakkkooo2-png/portfolio`
 - Local project path, when available: `C:\Users\test\Documents\Codex\2026-07-10\bang\work\portfolio`
 - GitHub repo: `https://github.com/cyakkkooo2-png/portfolio`
 - Production site: `https://ccyspace.icu/`
-- Railway project ID: `f31d6c94-e99e-4e76-b56c-1bc1d8363d44`
-- Railway environment ID: `6e74f57f-f723-4240-a319-a7091a0d48b5`
-- Railway service ID: `8f39feb6-0c67-4088-a390-e6ed3e64bd37`
-- Railway upload/data volume: `/data`
+- Production host: Tencent Cloud Lighthouse
+- Persistent data: `/var/www/ccyspace-data/data`
+- Persistent uploads: `/var/www/ccyspace-data/uploads`
+- Deployment source: GitHub `master`, checked automatically by the server
+- Railway details are historical only; do not treat Railway as the current production host.
 
 ## Backup workflow
 
@@ -36,6 +37,8 @@ Use this skill for the CCY SPACE portfolio project at `cyakkkooo2-png/portfolio`
    - Do not stage `client/dist/`, dependency folders, caches, secrets, `.env`, or unrelated local files.
    - If unrelated user changes exist, preserve them and ask before touching overlapping files.
 3. Update `项目维护说明.md` if important project facts changed.
+   - Treat Tencent Cloud Lighthouse as production unless the repository docs say it changed again.
+   - Never put server data, uploads, certificates, tokens, `.env` files, or runtime secrets in GitHub.
 4. Append a new entry to `历史任务备份.md` with:
    - backup name
    - date/time
@@ -78,4 +81,3 @@ Example restore commands:
 git fetch --tags
 git checkout -b restore-作品集1 作品集1
 ```
-
