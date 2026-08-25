@@ -12,5 +12,8 @@ server/data/
 
 # User uploads (stored on cloud disk, not in git)
 server/uploads/
+
+# Legacy repository videos (production videos live on Tencent Cloud)
+storage/videos/
 cloudflared.exe
 cf_output.txt
