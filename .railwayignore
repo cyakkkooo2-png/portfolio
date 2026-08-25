@@ -5,5 +5,8 @@ client/dist/
 server/tmp/
 server/uploads/
 server/data/
+storage/
+deploy/
+codex-task-history/
 *.log
 .env
