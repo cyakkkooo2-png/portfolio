@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { getWorks, deleteWork, reorderWorks, migrateLocalVideos } from '../../api';
+import { getWorks, deleteWork, reorderWorks, toggleWorkVisibility, migrateLocalVideos } from '../../api';
 
 function formatBytes(bytes) {
   if (!bytes) return '-';
@@ -18,6 +18,9 @@ export default function Dashboard() {
   const [savingOrder, setSavingOrder] = useState(false);
   const [migratingVideos, setMigratingVideos] = useState(false);
   const [migrationResult, setMigrationResult] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [batchBusy, setBatchBusy] = useState('');
+  const [batchMessage, setBatchMessage] = useState(null);
   const location = useLocation();
 
   useEffect(() => {
@@ -36,6 +39,7 @@ export default function Dashboard() {
     if (!window.confirm('确定删除这个作品吗？')) return;
     await deleteWork(id);
     setWorks((prev) => prev.filter((work) => work.id !== id));
+    setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
   }
 
   async function saveOrder(nextWorks) {
@@ -94,6 +98,61 @@ export default function Dashboard() {
     setResume(null);
   }
 
+  function toggleSelected(id) {
+    setSelectedIds((prev) => (
+      prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id]
+    ));
+  }
+
+  function selectAll(ids) {
+    setSelectedIds(ids);
+  }
+
+  async function handleBatchVisibility(hidden) {
+    if (!selectedIds.length || batchBusy) return;
+    const action = hidden ? '隐藏' : '显示';
+    setBatchBusy(action);
+    setBatchMessage(null);
+    try {
+      const results = await Promise.allSettled(selectedIds.map((id) => toggleWorkVisibility(id, hidden)));
+      const data = await getWorks();
+      setWorks(data.works || []);
+      const succeeded = results.filter((result) => result.status === 'fulfilled').length;
+      const failed = results.length - succeeded;
+      setBatchMessage(failed
+        ? { type: 'error', text: `已${action} ${succeeded} 个，${failed} 个未完成` }
+        : { type: 'success', text: `已${action} ${succeeded} 个作品` });
+    } catch (err) {
+      setBatchMessage({ type: 'error', text: err.message || `批量${action}失败` });
+    } finally {
+      setBatchBusy('');
+    }
+  }
+
+  async function handleBatchDelete() {
+    if (!selectedIds.length || batchBusy) return;
+    const ids = [...selectedIds];
+    if (!window.confirm(`确定永久删除选中的 ${ids.length} 个作品吗？此操作不可撤销。`)) return;
+    setBatchBusy('删除');
+    setBatchMessage(null);
+    try {
+      const results = await Promise.allSettled(ids.map((id) => deleteWork(id)));
+      const data = await getWorks();
+      const remainingIds = new Set((data.works || []).map((work) => work.id));
+      setWorks(data.works || []);
+      setSelectedIds((prev) => prev.filter((id) => remainingIds.has(id)));
+      const succeeded = results.filter((result) => result.status === 'fulfilled').length;
+      const failed = results.length - succeeded;
+      setBatchMessage(failed
+        ? { type: 'error', text: `已删除 ${succeeded} 个，${failed} 个未完成` }
+        : { type: 'success', text: `已删除 ${succeeded} 个作品` });
+    } catch (err) {
+      setBatchMessage({ type: 'error', text: err.message || '批量删除失败，请重试' });
+    } finally {
+      setBatchBusy('');
+    }
+  }
+
   async function handleMigrateVideos() {
     const ok = window.confirm('确认开始迁移本地视频吗？迁移成功后会把视频链接改为外部存储地址，并删除 Railway 本地视频副本以释放空间。失败的视频会保留本地副本。');
     if (!ok) return;
@@ -115,6 +174,9 @@ export default function Dashboard() {
     ? works.filter((work) => work.title.toLowerCase().includes(search.toLowerCase()))
     : works;
   const canArrange = !search;
+  const filteredIds = filtered.map((work) => work.id);
+  const selectedCount = selectedIds.length;
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.includes(id));
 
   const navs = [
     { k: '/admin', label: '概览', icon: (<svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" /></svg>) },
@@ -179,6 +241,54 @@ export default function Dashboard() {
                     <p className="mt-0.5 text-xs text-gray-400">{canArrange ? '拖动左侧手柄，或用上下按钮调整前台展示顺序。' : '搜索状态下暂时不能调整排序。'}</p>
                   </div>
                 </div>
+                <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-white px-6 py-3">
+                  <button
+                    type="button"
+                    onClick={() => selectAll(filteredIds)}
+                    disabled={!filteredIds.length || allFilteredSelected || Boolean(batchBusy)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {search ? '全选搜索结果' : '全选'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds([])}
+                    disabled={!selectedCount || Boolean(batchBusy)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    全不选
+                  </button>
+                  <span className="mr-auto text-xs text-gray-400">已选 {selectedCount} 项</span>
+                  {batchMessage && (
+                    <span className={`text-xs ${batchMessage.type === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                      {batchMessage.text}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleBatchVisibility(false)}
+                    disabled={!selectedCount || Boolean(batchBusy)}
+                    className="rounded-lg bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {batchBusy === '显示' ? '处理中...' : '批量显示'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBatchVisibility(true)}
+                    disabled={!selectedCount || Boolean(batchBusy)}
+                    className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {batchBusy === '隐藏' ? '处理中...' : '批量隐藏'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchDelete}
+                    disabled={!selectedCount || Boolean(batchBusy)}
+                    className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {batchBusy === '删除' ? '删除中...' : '批量删除'}
+                  </button>
+                </div>
                 <div className="grid grid-cols-12 gap-4 border-b border-gray-200 bg-gray-50 px-6 py-3 text-xs font-medium uppercase tracking-wider text-gray-500">
                   <div className="col-span-4">文件名称</div>
                   <div className="col-span-2">类型</div>
@@ -199,9 +309,17 @@ export default function Dashboard() {
                       onDragOver={(event) => canArrange && event.preventDefault()}
                       onDrop={() => dropWork(work.id)}
                       onDragEnd={() => setDragId('')}
-                      className={`grid grid-cols-12 items-center gap-4 border-b border-gray-50 px-6 py-3 transition-colors hover:bg-gray-50/50 ${dragId === work.id ? 'bg-blue-50/60 opacity-70' : ''}`}
+                      className={`grid grid-cols-12 items-center gap-4 border-b border-gray-50 px-6 py-3 transition-colors hover:bg-gray-50/50 ${selectedIds.includes(work.id) ? 'bg-blue-50/60' : ''} ${dragId === work.id ? 'opacity-70' : ''}`}
                     >
                       <div className="col-span-4 flex min-w-0 items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(work.id)}
+                          onChange={() => toggleSelected(work.id)}
+                          disabled={Boolean(batchBusy)}
+                          aria-label={`选择${work.title}`}
+                          className="h-4 w-4 flex-shrink-0 cursor-pointer rounded border-gray-300 text-blue-600 disabled:cursor-not-allowed"
+                        />
                         <button
                           type="button"
                           disabled={!canArrange || savingOrder}
@@ -222,6 +340,7 @@ export default function Dashboard() {
                         <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
                           {work.type === 'video' ? '视频' : work.type === 'image' ? '图片' : '文章'}
                         </span>
+                        {work.hidden && <span className="ml-2 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">已隐藏</span>}
                       </div>
                       <div className="col-span-2 text-right text-sm tabular-nums text-gray-500">{formatBytes(work.file_size)}</div>
                       <div className="col-span-2 text-sm text-gray-400">{new Date(work.created_at).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
