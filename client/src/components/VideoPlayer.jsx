@@ -1,6 +1,6 @@
 export default function VideoPlayer({ src, title }) {
   const videoUrl = src?.startsWith('/uploads/')
-    ? 'https://portfolio-production-913f.up.railway.app' + src
+    ? src
     : /^https?:\/\//i.test(src || '')
       ? `/api/works/proxy-video?url=${encodeURIComponent(src)}`
       : src;

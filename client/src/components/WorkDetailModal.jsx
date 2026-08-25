@@ -5,21 +5,21 @@ const labels = { video: '视频', image: '图片', article: '文章' };
 function assetUrl(url) {
   if (!url) return '';
   if (url.startsWith('//')) return `/api/works/proxy-image?url=${encodeURIComponent(`https:${url}`)}`;
-  if (url.startsWith('/uploads/')) return `https://portfolio-production-913f.up.railway.app${url}`;
+  if (url.startsWith('/uploads/')) return url;
   if (/^https?:\/\//i.test(url)) return `/api/works/proxy-image?url=${encodeURIComponent(url)}`;
   return url;
 }
 
 function videoUrl(url) {
   if (!url) return '';
-  if (url.startsWith('/uploads/')) return `https://portfolio-production-913f.up.railway.app${url}`;
+  if (url.startsWith('/uploads/')) return url;
   if (/^https?:\/\//i.test(url)) return `/api/works/proxy-video?url=${encodeURIComponent(url)}`;
   return url;
 }
 
 function documentUrl(url) {
   if (!url) return '';
-  if (url.startsWith('/uploads/')) return `https://portfolio-production-913f.up.railway.app${url}`;
+  if (url.startsWith('/uploads/')) return url;
   return url;
 }
 
