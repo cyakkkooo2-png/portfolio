@@ -98,6 +98,14 @@ server {
 
     client_max_body_size 2048m;
 
+    location ^~ /uploads/videos/ {
+        alias ${UPLOADS_DIR}/videos/;
+        sendfile on;
+        expires 1h;
+        add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+        access_log off;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:${PORT};
         proxy_http_version 1.1;
