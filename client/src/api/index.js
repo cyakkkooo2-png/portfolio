@@ -74,13 +74,6 @@ export function toggleWorkVisibility(id, hidden) {
   });
 }
 
-export function migrateLocalVideos() {
-  return request('/works/migrate-local-videos', {
-    method: 'POST',
-    body: JSON.stringify({ confirm: true }),
-  });
-}
-
 export function getVodUploadSignature() {
   return request('/works/vod-upload-signature', {
     method: 'POST',
