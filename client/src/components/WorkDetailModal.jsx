@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import VideoPlayer from './VideoPlayer';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
@@ -52,6 +52,7 @@ export default function WorkDetailModal({ work, onClose }) {
   const acc = '#ff6600';
   const [videoRatio, setVideoRatio] = useState(16 / 9);
   const [videoError, setVideoError] = useState(false);
+  const qualityControlTargetRef = useRef(null);
   const isExternalVideo = work?.type === 'video'
     && /^https?:\/\//i.test(work?.file_path || '')
     && !isTencentVodUrl(work?.file_path || '');
@@ -142,6 +143,7 @@ export default function WorkDetailModal({ work, onClose }) {
                 }}
                 onCanPlay={() => setVideoError(false)}
                 onError={() => setVideoError(true)}
+                qualityControlTargetRef={qualityControlTargetRef}
               />
               {isExternalVideo && videoError && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.28), rgba(0,0,0,0.82))' }}>
@@ -177,6 +179,9 @@ export default function WorkDetailModal({ work, onClose }) {
             scrollbarWidth: 'thin',
           }}
         >
+          {work.type === 'video' && (
+            <div className="mb-4 flex min-h-10 justify-end" ref={qualityControlTargetRef} />
+          )}
           <span className="mb-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium" style={{ background: `${acc}15`, color: acc, border: `1px solid ${acc}25` }}>
             <TypeIcon type={work.type} />
             {labels[work.type]}

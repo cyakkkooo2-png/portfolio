@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function VideoPlayer({
   src,
@@ -8,6 +9,7 @@ export default function VideoPlayer({
   onLoadedMetadata,
   onCanPlay,
   onError,
+  qualityControlTargetRef,
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -139,42 +141,51 @@ export default function VideoPlayer({
     );
   }
 
-  return (
-    <div
-      className={`${containerClassName} relative`}
-      onMouseMove={showControlsTemporarily}
-      onMouseEnter={showControlsTemporarily}
-      onTouchStart={showControlsTemporarily}
+  const qualityControl = isHlsSource ? (
+    <label
+      className={qualityControlTargetRef?.current
+        ? 'inline-flex items-center rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white'
+        : `absolute bottom-11 right-32 z-20 rounded bg-black/70 px-2 py-1 text-xs font-medium text-white shadow transition-opacity duration-200 ${controlsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+      style={qualityControlTargetRef?.current ? undefined : { display: 'block', backdropFilter: 'blur(5px)' }}
+      onMouseEnter={qualityControlTargetRef?.current ? undefined : clearControlsHideTimer}
+      onMouseLeave={qualityControlTargetRef?.current ? undefined : showControlsTemporarily}
     >
-      <video ref={videoRef} controls className={className} title={title} preload="metadata" onLoadedMetadata={onLoadedMetadata} onCanPlay={onCanPlay} onError={onError} onPlay={handlePlay} onPause={handlePause}>
-        您的浏览器不支持视频播放
-      </video>
-      {isHlsSource && (
-        <label
-          className={`absolute bottom-11 right-32 z-20 rounded bg-black/70 px-2 py-1 text-xs font-medium text-white shadow transition-opacity duration-200 ${controlsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-          style={{ display: 'block', backdropFilter: 'blur(5px)' }}
-          onMouseEnter={clearControlsHideTimer}
-          onMouseLeave={showControlsTemporarily}
+      <span className="mr-1.5">画质</span>
+      {qualityLevels.length > 0 ? (
+        <select
+          value={selectedQuality}
+          onChange={handleQualityChange}
+          className="cursor-pointer bg-transparent font-semibold text-white outline-none"
+          aria-label="手动选择视频清晰度"
         >
-          <span className="mr-1.5">画质</span>
-          {qualityLevels.length > 0 ? (
-            <select
-              value={selectedQuality}
-              onChange={handleQualityChange}
-              className="cursor-pointer bg-transparent font-semibold text-white outline-none"
-              aria-label="手动选择视频清晰度"
-            >
-              {qualityLevels.map((level) => (
-                <option key={level.index} value={String(level.index)} className="bg-gray-900 text-white">
-                  {level.height ? `${level.height}P` : `${Math.round(level.bitrate / 1000)}kbps`}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span>加载中…</span>
-          )}
-        </label>
+          {qualityLevels.map((level) => (
+            <option key={level.index} value={String(level.index)} className="bg-gray-900 text-white">
+              {level.height ? `${level.height}P` : `${Math.round(level.bitrate / 1000)}kbps`}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span>加载中…</span>
       )}
-    </div>
+    </label>
+  ) : null;
+
+  return (
+    <>
+      <div
+        className={`${containerClassName} relative`}
+        onMouseMove={showControlsTemporarily}
+        onMouseEnter={showControlsTemporarily}
+        onTouchStart={showControlsTemporarily}
+      >
+        <video ref={videoRef} controls className={className} title={title} preload="metadata" onLoadedMetadata={onLoadedMetadata} onCanPlay={onCanPlay} onError={onError} onPlay={handlePlay} onPause={handlePause}>
+          您的浏览器不支持视频播放
+        </video>
+        {!qualityControlTargetRef?.current && qualityControl}
+      </div>
+      {qualityControlTargetRef?.current && qualityControl
+        ? createPortal(qualityControl, qualityControlTargetRef.current)
+        : null}
+    </>
   );
 }
