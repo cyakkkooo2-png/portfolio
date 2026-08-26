@@ -11,8 +11,10 @@ export default function VideoPlayer({
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+  const controlsHideTimerRef = useRef(null);
   const [qualityLevels, setQualityLevels] = useState([]);
   const [selectedQuality, setSelectedQuality] = useState('');
+  const [controlsVisible, setControlsVisible] = useState(true);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
   const isTencentVod = /^https?:\/\/[^/]+\.(?:vod2\.myqcloud\.com|vod-qcloud\.com|vod\.tencent-cloud\.com)(?:\/|$)/i.test(src || '');
@@ -104,6 +106,31 @@ export default function VideoPlayer({
     }
   };
 
+  const clearControlsHideTimer = () => {
+    if (controlsHideTimerRef.current) {
+      window.clearTimeout(controlsHideTimerRef.current);
+      controlsHideTimerRef.current = null;
+    }
+  };
+
+  const showControlsTemporarily = () => {
+    clearControlsHideTimer();
+    setControlsVisible(true);
+    if (!videoRef.current?.paused) {
+      controlsHideTimerRef.current = window.setTimeout(() => {
+        setControlsVisible(false);
+      }, 2200);
+    }
+  };
+
+  const handlePlay = () => showControlsTemporarily();
+  const handlePause = () => {
+    clearControlsHideTimer();
+    setControlsVisible(true);
+  };
+
+  useEffect(() => () => clearControlsHideTimer(), []);
+
   if (!videoUrl) {
     return (
       <div className="aspect-video bg-gray-900 flex items-center justify-center rounded-lg">
@@ -113,21 +140,28 @@ export default function VideoPlayer({
   }
 
   return (
-    <div className={`${containerClassName} relative`}>
-      <video ref={videoRef} controls className={className} title={title} preload="metadata" onLoadedMetadata={onLoadedMetadata} onCanPlay={onCanPlay} onError={onError}>
+    <div
+      className={`${containerClassName} relative`}
+      onMouseMove={showControlsTemporarily}
+      onMouseEnter={showControlsTemporarily}
+      onTouchStart={showControlsTemporarily}
+    >
+      <video ref={videoRef} controls className={className} title={title} preload="metadata" onLoadedMetadata={onLoadedMetadata} onCanPlay={onCanPlay} onError={onError} onPlay={handlePlay} onPause={handlePause}>
         您的浏览器不支持视频播放
       </video>
       {isHlsSource && (
         <label
-          className="absolute right-3 top-3 z-20 rounded-md border border-white/30 bg-black/90 px-3 py-2 text-sm font-medium text-white shadow-lg"
-          style={{ display: 'block' }}
+          className={`absolute bottom-11 right-32 z-20 rounded bg-black/70 px-2 py-1 text-xs font-medium text-white shadow transition-opacity duration-200 ${controlsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          style={{ display: 'block', backdropFilter: 'blur(5px)' }}
+          onMouseEnter={clearControlsHideTimer}
+          onMouseLeave={showControlsTemporarily}
         >
-          <span className="mr-2">画质</span>
+          <span className="mr-1.5">画质</span>
           {qualityLevels.length > 0 ? (
             <select
               value={selectedQuality}
               onChange={handleQualityChange}
-              className="cursor-pointer rounded bg-gray-900 px-1 py-0.5 text-white outline-none"
+              className="cursor-pointer bg-transparent font-semibold text-white outline-none"
               aria-label="手动选择视频清晰度"
             >
               {qualityLevels.map((level) => (
