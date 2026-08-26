@@ -23,6 +23,7 @@ export default function VideoPlayer({
     : /^https?:\/\//i.test(src || '')
       ? `/api/works/proxy-video?url=${encodeURIComponent(src)}`
       : src;
+  const isHlsSource = /\.m3u8(?:$|\?)/i.test(videoUrl || '');
 
   useEffect(() => {
     const video = videoRef.current;
@@ -33,12 +34,7 @@ export default function VideoPlayer({
     setSelectedQuality('');
 
     async function attachSource() {
-      if (!/\.m3u8(?:$|\?)/i.test(videoUrl)) {
-        video.src = videoUrl;
-        return;
-      }
-
-      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      if (!isHlsSource) {
         video.src = videoUrl;
         return;
       }
@@ -46,6 +42,10 @@ export default function VideoPlayer({
       const { default: Hls } = await import('hls.js');
       if (cancelled) return;
       if (!Hls.isSupported()) {
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = videoUrl;
+          return;
+        }
         onErrorRef.current?.();
         return;
       }
@@ -93,7 +93,7 @@ export default function VideoPlayer({
       video.removeAttribute('src');
       video.load();
     };
-  }, [videoUrl]);
+  }, [videoUrl, isHlsSource]);
 
   const handleQualityChange = (event) => {
     const value = event.target.value;
@@ -117,21 +117,28 @@ export default function VideoPlayer({
       <video ref={videoRef} controls className={className} title={title} preload="metadata" onLoadedMetadata={onLoadedMetadata} onCanPlay={onCanPlay} onError={onError}>
         您的浏览器不支持视频播放
       </video>
-      {qualityLevels.length > 0 && (
-        <label className="absolute right-3 top-3 z-10 rounded-md bg-black/75 px-2 py-1 text-sm text-white shadow-lg">
+      {isHlsSource && (
+        <label
+          className="absolute right-3 top-3 z-20 rounded-md border border-white/30 bg-black/90 px-3 py-2 text-sm font-medium text-white shadow-lg"
+          style={{ display: 'block' }}
+        >
           <span className="mr-2">画质</span>
-          <select
-            value={selectedQuality}
-            onChange={handleQualityChange}
-            className="cursor-pointer bg-transparent text-white outline-none"
-            aria-label="手动选择视频清晰度"
-          >
-            {qualityLevels.map((level) => (
-              <option key={level.index} value={String(level.index)} className="bg-gray-900 text-white">
-                {level.height ? `${level.height}P` : `${Math.round(level.bitrate / 1000)}kbps`}
-              </option>
-            ))}
-          </select>
+          {qualityLevels.length > 0 ? (
+            <select
+              value={selectedQuality}
+              onChange={handleQualityChange}
+              className="cursor-pointer rounded bg-gray-900 px-1 py-0.5 text-white outline-none"
+              aria-label="手动选择视频清晰度"
+            >
+              {qualityLevels.map((level) => (
+                <option key={level.index} value={String(level.index)} className="bg-gray-900 text-white">
+                  {level.height ? `${level.height}P` : `${Math.round(level.bitrate / 1000)}kbps`}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span>加载中…</span>
+          )}
         </label>
       )}
     </div>
