@@ -70,7 +70,12 @@ export default function VideoPlayer({
         }
 
         const highest = levels[0];
-        hls.currentLevel = highest.index;
+        // `currentLevel` alone does not control Hls.js's very first fragment.
+        // Pin all initial-load selectors before startLoad so the opening seconds
+        // cannot come from the lowest rendition used by its bandwidth test.
+        hls.startLevel = highest.index;
+        hls.loadLevel = highest.index;
+        hls.nextLoadLevel = highest.index;
         setQualityLevels(levels);
         setSelectedQuality(String(highest.index));
         hls.startLoad();
