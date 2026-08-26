@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import VideoPlayer from './VideoPlayer';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
 
@@ -12,14 +13,6 @@ function assetUrl(url) {
   if (url.startsWith('/uploads/')) return url;
   if (isTencentVodUrl(url)) return url;
   if (/^https?:\/\//i.test(url)) return `/api/works/proxy-image?url=${encodeURIComponent(url)}`;
-  return url;
-}
-
-function videoUrl(url) {
-  if (!url) return '';
-  if (url.startsWith('/uploads/')) return url;
-  if (isTencentVodUrl(url)) return url;
-  if (/^https?:\/\//i.test(url)) return `/api/works/proxy-video?url=${encodeURIComponent(url)}`;
   return url;
 }
 
@@ -59,7 +52,9 @@ export default function WorkDetailModal({ work, onClose }) {
   const acc = '#ff6600';
   const [videoRatio, setVideoRatio] = useState(16 / 9);
   const [videoError, setVideoError] = useState(false);
-  const isExternalVideo = work?.type === 'video' && /^https?:\/\//i.test(work?.file_path || '');
+  const isExternalVideo = work?.type === 'video'
+    && /^https?:\/\//i.test(work?.file_path || '')
+    && !isTencentVodUrl(work?.file_path || '');
   const originalUrl = work?.external_url || work?.source_url || work?.file_path;
   const isLinkOnlyVideo = work?.type === 'video' && !work?.file_path && !!originalUrl;
 
@@ -134,10 +129,10 @@ export default function WorkDetailModal({ work, onClose }) {
             </div>
           ) : work.type === 'video' ? (
             <div className="relative h-full w-full">
-              <video
-                src={videoUrl(work.file_path)}
-                controls
-                preload="metadata"
+              <VideoPlayer
+                src={work.file_path}
+                title={work.title}
+                containerClassName="h-full w-full bg-black"
                 className="h-full w-full object-contain"
                 onLoadedMetadata={(event) => {
                   const video = event.currentTarget;
