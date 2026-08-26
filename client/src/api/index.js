@@ -81,6 +81,63 @@ export function migrateLocalVideos() {
   });
 }
 
+export function getVodUploadSignature() {
+  return request('/works/vod-upload-signature', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function completeVodUpload(payload) {
+  return request('/works/vod-complete', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function uploadVideoDirectToVod({
+  videoFile,
+  coverFile,
+  metadata,
+  onProgress,
+}) {
+  const { default: TcVod } = await import('vod-js-sdk-v6');
+  const tcVod = new TcVod({
+    getSignature: async () => {
+      const data = await getVodUploadSignature();
+      return data.signature;
+    },
+  });
+
+  const uploader = tcVod.upload({
+    mediaFile: videoFile,
+    coverFile: coverFile || undefined,
+    mediaName: metadata.title,
+    enableResume: true,
+  });
+
+  uploader.on('media_progress', (info) => {
+    const rawPercent = Number(info?.percent || 0);
+    onProgress?.({
+      percent: Math.max(0, Math.min(100, Math.round(rawPercent * 100))),
+    });
+  });
+
+  const result = await uploader.done();
+  if (!result?.fileId || !result?.video?.url) {
+    throw new Error('腾讯云点播没有返回完整的视频信息');
+  }
+
+  onProgress?.({ percent: 100 });
+  return completeVodUpload({
+    ...metadata,
+    fileUrl: result.video.url,
+    coverUrl: result.cover?.url || '',
+    fileId: result.fileId,
+    fileSize: videoFile.size,
+  });
+}
+
 export function uploadWorkWithProgress(formData, { onProgress, method = 'POST', workId = null } = {}) {
   return new Promise((resolve, reject) => {
     const token = getToken();

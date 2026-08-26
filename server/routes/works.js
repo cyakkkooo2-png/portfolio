@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { Readable } = require('stream');
 const db = require('../db/database');
 const { authMiddleware, optionalAuthMiddleware } = require('../middleware/auth');
@@ -11,6 +12,25 @@ const vodStorage = require('../vod-storage');
 const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
 
 const router = express.Router();
+
+function createVodClientUploadSignature() {
+  const secretId = process.env.TENCENT_VOD_SECRET_ID || '';
+  const secretKey = process.env.TENCENT_VOD_SECRET_KEY || '';
+  if (!secretId || !secretKey) throw new Error('腾讯云点播密钥未配置');
+
+  const currentTimeStamp = Math.floor(Date.now() / 1000);
+  const params = new URLSearchParams({
+    secretId,
+    currentTimeStamp: String(currentTimeStamp),
+    expireTime: String(currentTimeStamp + 30 * 60),
+    random: String(crypto.randomInt(1, 0x7fffffff)),
+    vodSubAppId: String(process.env.TENCENT_VOD_SUB_APP_ID || 1451500466),
+    oneTimeValid: '1',
+  });
+  const original = params.toString();
+  const digest = crypto.createHmac('sha1', secretKey).update(original).digest();
+  return Buffer.concat([digest, Buffer.from(original)]).toString('base64');
+}
 
 ensureDir(TMP_DIR);
 ['images', 'videos', 'articles', 'documents'].forEach(s => {
@@ -751,6 +771,56 @@ router.get('/proxy-image', async (req, res) => {
   } catch (err) {
     console.error('Proxy image error:', err);
     res.status(500).send('Image proxy failed');
+  }
+});
+
+// POST /api/works/vod-upload-signature
+// The browser uploads directly to Tencent VOD. SecretKey never leaves the server;
+// only this short-lived, single-use signature is returned to an authenticated admin.
+router.post('/vod-upload-signature', authMiddleware, (req, res) => {
+  try {
+    res.json({ signature: createVodClientUploadSignature() });
+  } catch (err) {
+    console.error('VOD signature error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/works/vod-complete
+// Record the VOD result after the Web SDK has uploaded video/cover directly.
+router.post('/vod-complete', authMiddleware, (req, res) => {
+  try {
+    const {
+      title, description, content, tags, category,
+      fileUrl, coverUrl, fileId, fileSize,
+    } = req.body || {};
+    if (!title || !fileUrl || !fileId) {
+      return res.status(400).json({ error: '云点播上传结果不完整' });
+    }
+    if (!/^https:\/\//i.test(String(fileUrl))) {
+      return res.status(400).json({ error: '云点播视频地址无效' });
+    }
+    if (rejectDuplicate(res, findDuplicateWork({ title, type: 'video', filePath: fileUrl }))) return;
+
+    const parsedTags = Array.isArray(tags)
+      ? tags
+      : (typeof tags === 'string' ? JSON.parse(tags || '[]') : []);
+    const work = db.createWork({
+      title: String(title).trim(),
+      description: String(description || ''),
+      type: 'video',
+      file_path: String(fileUrl),
+      content: String(content || ''),
+      thumbnail: /^https:\/\//i.test(String(coverUrl || '')) ? String(coverUrl) : '',
+      vod_file_id: String(fileId),
+      tags: parsedTags,
+      category: String(category || '').trim().slice(0, 40),
+      file_size: Number(fileSize) || null,
+    });
+    res.status(201).json({ work });
+  } catch (err) {
+    console.error('VOD complete error:', err.message);
+    res.status(500).json({ error: '保存云点播作品失败: ' + err.message });
   }
 });
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { uploadWorkWithProgress } from '../../api';
+import { uploadVideoDirectToVod, uploadWorkWithProgress } from '../../api';
 import ProgressBar from '../../components/ProgressBar';
 import StorageBar from '../../components/StorageBar';
 import { useAuth } from '../../context/AuthContext';
@@ -272,27 +272,26 @@ export default function UploadWork() {
         const videoFile = batchFiles[index];
         const titleFromFile = videoFile.name.replace(/\.[^/.]+$/, '') || videoFile.name;
         const fileName = `(${index + 1}/${batchFiles.length}) ${videoFile.name}`;
-        const formData = new FormData();
-        formData.append('title', titleFromFile);
-        formData.append('description', description);
-        formData.append('type', 'video');
-        formData.append('content', content);
-        formData.append('tags', JSON.stringify(tags.split(',').map((tag) => tag.trim()).filter(Boolean)));
-        formData.append('category', category.trim());
-        formData.append('video', videoFile);
 
         let coverToUpload = cover;
         if (!coverToUpload) {
           setProgress({ percent: Math.round((index / batchFiles.length) * 100), speed: 'Generating video cover...', fileName });
           coverToUpload = await captureVideoCover(videoFile);
         }
-        if (coverToUpload) formData.append('cover', coverToUpload);
 
-        await uploadWorkWithProgress(formData, {
-          method: 'POST',
+        await uploadVideoDirectToVod({
+          videoFile,
+          coverFile: coverToUpload,
+          metadata: {
+            title: titleFromFile,
+            description,
+            content,
+            tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+            category: category.trim(),
+          },
           onProgress: (uploadProgress) => {
             const percent = Math.round(((index + (uploadProgress.percent / 100)) / batchFiles.length) * 100);
-            setProgress({ percent, speed: uploadProgress.speed || '', fileName });
+            setProgress({ percent, speed: '直传腾讯云点播', fileName });
           },
         });
       }
@@ -320,8 +319,6 @@ export default function UploadWork() {
     const fileName = file?.name || title;
     setProgress({ percent: 0, speed: '', fileName });
 
-    let timer = null;
-    let lastPercent = 0;
     try {
       const formData = new FormData();
       formData.append('title', title);
@@ -338,25 +335,33 @@ export default function UploadWork() {
       }
       if (coverToUpload) formData.append('cover', coverToUpload);
 
-      await uploadWorkWithProgress(formData, {
-        method: 'POST',
-        onProgress: (p) => {
-          lastPercent = p.percent;
-          setProgress({ percent: p.percent, speed: p.speed || '', fileName });
-          if (p.percent >= 90 && !timer) {
-            timer = setInterval(() => {
-              lastPercent = Math.min(99, lastPercent + 1);
-              setProgress({ percent: lastPercent, speed: '保存到云端...', fileName });
-            }, 800);
-          }
-        },
-      });
+      if (type === 'video') {
+        await uploadVideoDirectToVod({
+          videoFile: file,
+          coverFile: coverToUpload,
+          metadata: {
+            title: title.trim(),
+            description,
+            content,
+            tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+            category: category.trim(),
+          },
+          onProgress: (p) => {
+            setProgress({ percent: p.percent, speed: '直传腾讯云点播', fileName });
+          },
+        });
+      } else {
+        await uploadWorkWithProgress(formData, {
+          method: 'POST',
+          onProgress: (p) => {
+            setProgress({ percent: p.percent, speed: p.speed || '', fileName });
+          },
+        });
+      }
 
-      if (timer) clearInterval(timer);
       setProgress({ percent: 100, speed: '', fileName });
       setTimeout(() => navigate('/admin'), 500);
     } catch (err) {
-      if (timer) clearInterval(timer);
       setError(err.message || '上传失败');
     } finally {
       setUploading(false);
@@ -415,7 +420,7 @@ export default function UploadWork() {
 
         <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-1 text-base font-bold text-gray-900">作品上传</h2>
-          <p className="mb-5 text-sm text-gray-500">上传视频、图片或文章。视频会优先保存到腾讯云点播并通过 CDN 播放。</p>
+          <p className="mb-5 text-sm text-gray-500">上传视频、图片或文章。视频会从浏览器直传腾讯云点播，并通过 CDN 播放。</p>
 
           {error && <div className="mb-5 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
