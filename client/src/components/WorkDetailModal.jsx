@@ -179,13 +179,15 @@ export default function WorkDetailModal({ work, onClose }) {
             scrollbarWidth: 'thin',
           }}
         >
-          {work.type === 'video' && (
-            <div className="mb-4 flex min-h-10 justify-end" ref={qualityControlTargetRef} />
-          )}
-          <span className="mb-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium" style={{ background: `${acc}15`, color: acc, border: `1px solid ${acc}25` }}>
-            <TypeIcon type={work.type} />
-            {labels[work.type]}
-          </span>
+          <div className="mb-4 flex min-h-10 items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium" style={{ background: `${acc}15`, color: acc, border: `1px solid ${acc}25` }}>
+              <TypeIcon type={work.type} />
+              {labels[work.type]}
+            </span>
+            {work.type === 'video' && (
+              <div className="flex justify-end" ref={qualityControlTargetRef} />
+            )}
+          </div>
           <h2 className="mb-3 text-2xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
             {work.title}
           </h2>
