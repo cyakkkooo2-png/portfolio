@@ -23,15 +23,10 @@ router.get('/', (req, res) => {
     return s + ((total - c.times.idle) / total) * 100;
   }, 0) / cpus.length);
 
-  const totalGB = 50; // COS free tier
-
   res.json({
     usedBytes: totalUsedBytes,
-    totalBytes: totalGB * 1024 * 1024 * 1024,
     usedMB: (totalUsedBytes / (1024 * 1024)).toFixed(1),
     usedGB: (totalUsedBytes / (1024 * 1024 * 1024)).toFixed(2),
-    totalGB,
-    percentUsed: Math.min(100, (totalUsedBytes / (totalGB * 1024 * 1024 * 1024)) * 100).toFixed(1),
     server: {
       memory: {
         totalMB: Math.round(totalMem / (1024 * 1024)),
