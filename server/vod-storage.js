@@ -2,8 +2,10 @@ const { VodUploadClient, VodUploadRequest } = require('vod-node-sdk');
 const tencentcloud = require('tencentcloud-sdk-nodejs-vod');
 
 const VodApiClient = tencentcloud.vod.v20180717.Client;
-const ADAPTIVE_TEMPLATE_ID = 10;
+const SINGLE_TRANSCODE_TEMPLATE_NAME = 'ccyspace-single-6000k';
+const SINGLE_TRANSCODE_BITRATE = 6000;
 let apiClient = null;
+let singleTranscodeTemplateId = null;
 
 function credentials() {
   return {
@@ -35,69 +37,105 @@ function subAppId() {
   return Number(process.env.TENCENT_VOD_SUB_APP_ID || 1451500466);
 }
 
-async function requestAdaptiveTranscode(fileId) {
+async function getSingleTranscodeTemplateId() {
+  const configuredId = Number(process.env.TENCENT_VOD_TRANSCODE_TEMPLATE_ID || 0);
+  if (Number.isInteger(configuredId) && configuredId > 0) return configuredId;
+  if (singleTranscodeTemplateId) return singleTranscodeTemplateId;
+
+  const existing = await getApiClient().DescribeTranscodeTemplates({
+    SubAppId: subAppId(),
+    Type: 'Custom',
+    ContainerType: 'Video',
+    TEHDType: 'Common',
+    Limit: 100,
+  });
+  const template = (existing.TranscodeTemplateSet || []).find((item) => (
+    item.Name === SINGLE_TRANSCODE_TEMPLATE_NAME
+    && item.Container === 'mp4'
+    && Number(item.VideoTemplate?.Bitrate) === SINGLE_TRANSCODE_BITRATE
+  ));
+  if (template) {
+    singleTranscodeTemplateId = Number(template.Definition);
+    return singleTranscodeTemplateId;
+  }
+
+  const created = await getApiClient().CreateTranscodeTemplate({
+    SubAppId: subAppId(),
+    Name: SINGLE_TRANSCODE_TEMPLATE_NAME,
+    Comment: 'CCY SPACE single MP4 output at 6000 Kbps',
+    Container: 'mp4',
+    RemoveVideo: 0,
+    RemoveAudio: 0,
+    VideoTemplate: {
+      Codec: 'libx264',
+      Bitrate: SINGLE_TRANSCODE_BITRATE,
+      Fps: 0,
+      ResolutionAdaptive: 'open',
+      Width: 0,
+      Height: 0,
+      FillType: 'black',
+    },
+    AudioTemplate: {
+      Codec: 'libfdk_aac',
+      Bitrate: 128,
+      SampleRate: 48000,
+      AudioChannel: 2,
+    },
+  });
+  singleTranscodeTemplateId = Number(created.Definition);
+  return singleTranscodeTemplateId;
+}
+
+async function requestSingleTranscode(fileId) {
+  const definition = await getSingleTranscodeTemplateId();
   return getApiClient().ProcessMedia({
     FileId: String(fileId),
     SubAppId: subAppId(),
     MediaProcessTask: {
-      AdaptiveDynamicStreamingTaskSet: [{ Definition: ADAPTIVE_TEMPLATE_ID }],
+      TranscodeTaskSet: [{ Definition: definition }],
     },
     TasksNotifyMode: 'None',
-    SessionId: `ccyspace-abr-${String(fileId)}`.slice(0, 50),
+    SessionId: `ccyspace-single-6000-${String(fileId)}`.slice(0, 50),
   });
 }
 
-async function getAdaptivePlaybackUrl(fileId) {
+async function getSingleTranscodeUrl(fileId) {
+  const definition = await getSingleTranscodeTemplateId();
   const result = await getApiClient().DescribeMediaInfos({
     FileIds: [String(fileId)],
     SubAppId: subAppId(),
-    Filters: ['adaptiveDynamicStreamingInfo'],
+    Filters: ['transcodeInfo'],
   });
-  const streams = result.MediaInfoSet?.[0]?.AdaptiveDynamicStreamingInfo?.AdaptiveDynamicStreamingSet || [];
-  const preferred = streams.find((item) => Number(item.Definition) === ADAPTIVE_TEMPLATE_ID && item.Url)
-    || streams.find((item) => item.Url);
-  return preferred?.Url || '';
+  const streams = result.MediaInfoSet?.[0]?.TranscodeInfo?.TranscodeSet || [];
+  return streams.find((item) => Number(item.Definition) === definition && item.Url)?.Url || '';
 }
 
-async function syncAdaptiveWorks(db) {
+async function syncRequestedTranscodes(db) {
   if (!isConfigured()) return;
-  const works = db.getWorks().filter((work) => work.type === 'video' && work.vod_file_id);
+  const works = db.getWorks().filter((work) => (
+    work.type === 'video'
+    && work.vod_file_id
+    && work.vod_transcode_profile === 'single-6000'
+    && work.vod_transcode_requested
+    && work.vod_transcode_status === 'processing'
+  ));
 
   for (const work of works) {
-    if (/\.m3u8(?:$|\?)/i.test(String(work.file_path || ''))) continue;
     try {
-      const adaptiveUrl = await getAdaptivePlaybackUrl(work.vod_file_id);
-      if (adaptiveUrl) {
-        db.updateWork(work.id, { file_path: adaptiveUrl, vod_transcode_status: 'ready' });
-        continue;
-      }
-
-      if (!work.vod_transcode_requested) {
-        await requestAdaptiveTranscode(work.vod_file_id);
-        db.updateWork(work.id, {
-          vod_transcode_requested: true,
-          vod_transcode_status: 'processing',
-        });
-      }
+      const transcodedUrl = await getSingleTranscodeUrl(work.vod_file_id);
+      if (transcodedUrl) db.updateWork(work.id, { file_path: transcodedUrl, vod_transcode_status: 'ready' });
     } catch (err) {
-      if (String(err.code || '').includes('Duplicate')) {
-        db.updateWork(work.id, {
-          vod_transcode_requested: true,
-          vod_transcode_status: 'processing',
-        });
-      } else {
-        console.error(`VOD adaptive sync failed for ${work.vod_file_id}:`, err.message);
-      }
+      console.error(`VOD single transcode status check failed for ${work.vod_file_id}:`, err.message);
     }
   }
 }
 
-function startAdaptiveSync(db) {
+function startTranscodeStatusSync(db) {
   const run = async () => {
     try {
-      await syncAdaptiveWorks(db);
+      await syncRequestedTranscodes(db);
     } catch (err) {
-      console.error('VOD adaptive sync failed:', err.message);
+      console.error('VOD single transcode status check failed:', err.message);
     }
     const timer = setTimeout(run, 60 * 1000);
     timer.unref?.();
@@ -140,7 +178,7 @@ function uploadFile(mediaFilePath, { coverFilePath = '', mediaName = '' } = {}) 
 module.exports = {
   isConfigured,
   uploadFile,
-  requestAdaptiveTranscode,
-  getAdaptivePlaybackUrl,
-  startAdaptiveSync,
+  requestSingleTranscode,
+  getSingleTranscodeUrl,
+  startTranscodeStatusSync,
 };

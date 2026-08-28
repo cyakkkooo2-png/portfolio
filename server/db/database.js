@@ -54,6 +54,7 @@ function createWork(data) {
     type: data.type,
     file_path: data.file_path || '',
     vod_file_id: data.vod_file_id || '',
+    vod_transcode_profile: data.vod_transcode_profile || '',
     vod_transcode_requested: Boolean(data.vod_transcode_requested),
     vod_transcode_status: data.vod_transcode_status || '',
     file_size: data.file_size || null, // bytes

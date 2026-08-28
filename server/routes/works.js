@@ -788,7 +788,7 @@ router.post('/vod-upload-signature', authMiddleware, (req, res) => {
 
 // POST /api/works/vod-complete
 // Record the VOD result after the Web SDK has uploaded video/cover directly.
-router.post('/vod-complete', authMiddleware, (req, res) => {
+router.post('/vod-complete', authMiddleware, async (req, res) => {
   try {
     const {
       title, description, content, tags, category,
@@ -805,7 +805,7 @@ router.post('/vod-complete', authMiddleware, (req, res) => {
     const parsedTags = Array.isArray(tags)
       ? tags
       : (typeof tags === 'string' ? JSON.parse(tags || '[]') : []);
-    const work = db.createWork({
+    let work = db.createWork({
       title: String(title).trim(),
       description: String(description || ''),
       type: 'video',
@@ -813,10 +813,24 @@ router.post('/vod-complete', authMiddleware, (req, res) => {
       content: String(content || ''),
       thumbnail: /^https:\/\//i.test(String(coverUrl || '')) ? String(coverUrl) : '',
       vod_file_id: String(fileId),
+      vod_transcode_profile: 'single-6000',
       tags: parsedTags,
       category: String(category || '').trim().slice(0, 40),
       file_size: Number(fileSize) || null,
     });
+    try {
+      await vodStorage.requestSingleTranscode(fileId);
+      work = db.updateWork(work.id, {
+        vod_transcode_requested: true,
+        vod_transcode_status: 'processing',
+      });
+    } catch (transcodeError) {
+      console.error('VOD single transcode submission failed:', transcodeError.message);
+      work = db.updateWork(work.id, {
+        vod_transcode_requested: false,
+        vod_transcode_status: 'failed',
+      });
+    }
     res.status(201).json({ work });
   } catch (err) {
     console.error('VOD complete error:', err.message);

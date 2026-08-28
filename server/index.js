@@ -58,7 +58,7 @@ function seedAdmin() {
 
 app.listen(PORT, () => {
   seedAdmin();
-  vodStorage.startAdaptiveSync(db);
+  vodStorage.startTranscodeStatusSync(db);
   console.log(`Server running at http://localhost:${PORT}`);
   console.log(`Upload directory: ${UPLOADS_DIR}`);
 });
