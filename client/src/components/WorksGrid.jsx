@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getWorks, reorderWorks, toggleWorkVisibility } from '../api';
+import { getWorks, reorderWorks, toggleWorkFeatured, toggleWorkVisibility } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 
-const FEATURED_LIMIT = 9;
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
 
@@ -145,6 +144,7 @@ export default function WorksGrid({ onSelectWork }) {
   const [arrangeMode, setArrangeMode] = useState(false);
   const [selectedWorkIds, setSelectedWorkIds] = useState([]);
   const [batchSaving, setBatchSaving] = useState(false);
+  const [featuredBusyId, setFeaturedBusyId] = useState('');
   const acc = t?.accentColor || '#ff6600';
   const isLoggedIn = Boolean(user);
   const canArrange = isLoggedIn && arrangeMode;
@@ -163,7 +163,7 @@ export default function WorksGrid({ onSelectWork }) {
 
   const visibleWorks = useMemo(() => {
     let list = works;
-    if (filter === 'featured') list = list.slice(0, FEATURED_LIMIT);
+    if (filter === 'featured') list = list.filter((work) => work.featured);
     if (filter === 'video') list = list.filter((work) => work.type === 'video');
     if (filter === 'image') list = list.filter((work) => work.type === 'image');
     if (filter === 'article') list = list.filter((work) => work.type === 'article');
@@ -255,6 +255,31 @@ export default function WorksGrid({ onSelectWork }) {
     }
   }
 
+  async function handleToggleFeatured(event, work) {
+    event.stopPropagation();
+    if (featuredBusyId) return;
+    const nextFeatured = !work.featured;
+    const previousWorks = works;
+    setFeaturedBusyId(work.id);
+    setWorks((current) => current.map((item) => (
+      item.id === work.id ? { ...item, featured: nextFeatured } : item
+    )));
+
+    try {
+      const data = await toggleWorkFeatured(work.id, nextFeatured);
+      if (data.work) {
+        setWorks((current) => current.map((item) => (
+          item.id === work.id ? { ...item, ...data.work } : item
+        )));
+      }
+    } catch (err) {
+      setWorks(previousWorks);
+      alert(err.message || '修改精选状态失败');
+    } finally {
+      setFeaturedBusyId('');
+    }
+  }
+
   function toggleSelectedWork(event, workId) {
     event.stopPropagation();
     setSelectedWorkIds((current) => (
@@ -320,7 +345,7 @@ export default function WorksGrid({ onSelectWork }) {
               </button>
               {arrangeMode && (
                 <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-600">
-                  <span>{savingOrder ? '正在保存排序…' : selectedMoveId ? '已选中作品：再点击目标作品即可移动；点击同一张可取消' : '排序模式：先点要移动的作品，再点目标位置；前 9 个会显示在精选'}</span>
+                  <span>{savingOrder ? '正在保存排序…' : selectedMoveId ? '已选中作品：再点击目标作品即可移动；点击同一张可取消' : '排序模式：先点要移动的作品，再点目标位置'}</span>
                 </div>
               )}
               {!arrangeMode && (
@@ -423,7 +448,7 @@ export default function WorksGrid({ onSelectWork }) {
             </div>
           ) : visibleWorks.length === 0 ? (
             <div className="rounded-2xl py-20 text-center" style={{ background: '#f7f8fb', color: '#a0a6b3' }}>
-              <RichText value={t?.worksEmpty} fallback="还没有作品" />
+              {filter === 'featured' ? '还没有选择精选作品' : <RichText value={t?.worksEmpty} fallback="还没有作品" />}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -449,6 +474,18 @@ export default function WorksGrid({ onSelectWork }) {
                         title={work.hidden ? '让游客重新看到这个作品' : '隐藏后游客看不到，登录后仍可管理'}
                       >
                         {work.hidden ? '显示' : '隐藏'}
+                      </button>
+                    )}
+                    {isLoggedIn && !canArrange && (
+                      <button
+                        type="button"
+                        onClick={(event) => handleToggleFeatured(event, work)}
+                        disabled={Boolean(featuredBusyId)}
+                        className="absolute left-4 top-14 z-20 rounded-full px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
+                        style={work.featured ? { background: acc, color: '#fff' } : { background: 'rgba(255,255,255,0.95)', color: '#4b5563' }}
+                        title={work.featured ? '从精选栏目移除' : '加入精选栏目'}
+                      >
+                        {featuredBusyId === work.id ? '保存中' : work.featured ? '★ 已精选' : '☆ 设为精选'}
                       </button>
                     )}
                     {isLoggedIn && !canArrange && (

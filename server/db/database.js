@@ -65,6 +65,7 @@ function createWork(data) {
     tags: data.tags || [],
     category: data.type === 'video' ? (data.category || '') : '',
     hidden: Boolean(data.hidden),
+    featured: Boolean(data.featured),
     order: maxOrder + 1,
     created_at: new Date().toISOString(),
   };

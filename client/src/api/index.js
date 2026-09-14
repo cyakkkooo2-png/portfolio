@@ -74,6 +74,13 @@ export function toggleWorkVisibility(id, hidden) {
   });
 }
 
+export function toggleWorkFeatured(id, featured) {
+  return request(`/works/${id}/featured`, {
+    method: 'PATCH',
+    body: JSON.stringify({ featured }),
+  });
+}
+
 export function getVodUploadSignature() {
   return request('/works/vod-upload-signature', {
     method: 'POST',

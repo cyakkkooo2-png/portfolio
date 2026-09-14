@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { getWorks, deleteWork, reorderWorks, toggleWorkVisibility } from '../../api';
+import { getWorks, deleteWork, reorderWorks, toggleWorkFeatured, toggleWorkVisibility } from '../../api';
 
 function formatBytes(bytes) {
   if (!bytes) return '-';
@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [batchBusy, setBatchBusy] = useState('');
   const [batchMessage, setBatchMessage] = useState(null);
+  const [featuredBusyId, setFeaturedBusyId] = useState('');
   const location = useLocation();
 
   useEffect(() => {
@@ -94,6 +95,30 @@ export default function Dashboard() {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
     setResume(null);
+  }
+
+  async function handleToggleFeatured(work) {
+    if (featuredBusyId) return;
+    const nextFeatured = !work.featured;
+    setFeaturedBusyId(work.id);
+    setWorks((current) => current.map((item) => (
+      item.id === work.id ? { ...item, featured: nextFeatured } : item
+    )));
+    try {
+      const data = await toggleWorkFeatured(work.id, nextFeatured);
+      if (data.work) {
+        setWorks((current) => current.map((item) => (
+          item.id === work.id ? { ...item, ...data.work } : item
+        )));
+      }
+    } catch (err) {
+      setWorks((current) => current.map((item) => (
+        item.id === work.id ? { ...item, featured: work.featured } : item
+      )));
+      setBatchMessage({ type: 'error', text: err.message || '修改精选状态失败' });
+    } finally {
+      setFeaturedBusyId('');
+    }
   }
 
   function toggleSelected(id) {
@@ -322,10 +347,20 @@ export default function Dashboard() {
                           {work.type === 'video' ? '视频' : work.type === 'image' ? '图片' : '文章'}
                         </span>
                         {work.hidden && <span className="ml-2 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">已隐藏</span>}
+                        {work.featured && <span className="ml-2 inline-block rounded-full bg-orange-50 px-2 py-0.5 text-xs text-orange-700">精选</span>}
                       </div>
                       <div className="col-span-2 text-right text-sm tabular-nums text-gray-500">{formatBytes(work.file_size)}</div>
                       <div className="col-span-2 text-sm text-gray-400">{new Date(work.created_at).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
                       <div className="col-span-2 flex justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFeatured(work)}
+                          disabled={Boolean(featuredBusyId)}
+                          className={`rounded-lg px-2 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${work.featured ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'text-gray-400 hover:bg-orange-50 hover:text-orange-600'}`}
+                          title={work.featured ? '从精选栏目移除' : '加入精选栏目'}
+                        >
+                          {featuredBusyId === work.id ? '保存中' : work.featured ? '取消精选' : '设为精选'}
+                        </button>
                         <button
                           onClick={() => moveWork(work.id, -1)}
                           disabled={!canArrange || savingOrder || index === 0}
