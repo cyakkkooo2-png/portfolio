@@ -571,6 +571,10 @@ function filterPublicWorks(works, req) {
   return works.filter((work) => !work.hidden);
 }
 
+function fileNameWithoutExtension(value = '') {
+  return path.parse(String(value || '')).name.trim();
+}
+
 async function uploadVideoToStorage(tmpPath, filename, options = {}) {
   if (vodStorage.isConfigured()) {
     try {
@@ -801,21 +805,22 @@ router.post('/vod-complete', authMiddleware, async (req, res) => {
   try {
     const {
       title, description, content, tags, category,
-      fileUrl, coverUrl, fileId, fileSize,
+      fileUrl, coverUrl, fileId, fileSize, originalName,
     } = req.body || {};
-    if (!title || !fileUrl || !fileId) {
+    const resolvedTitle = String(title || '').trim() || fileNameWithoutExtension(originalName);
+    if (!resolvedTitle || !fileUrl || !fileId) {
       return res.status(400).json({ error: '云点播上传结果不完整' });
     }
     if (!/^https:\/\//i.test(String(fileUrl))) {
       return res.status(400).json({ error: '云点播视频地址无效' });
     }
-    if (rejectDuplicate(res, findDuplicateWork({ title, type: 'video', filePath: fileUrl }))) return;
+    if (rejectDuplicate(res, findDuplicateWork({ title: resolvedTitle, type: 'video', filePath: fileUrl, originalName }))) return;
 
     const parsedTags = Array.isArray(tags)
       ? tags
       : (typeof tags === 'string' ? JSON.parse(tags || '[]') : []);
     let work = db.createWork({
-      title: String(title).trim(),
+      title: resolvedTitle,
       description: String(description || ''),
       type: 'video',
       file_path: String(fileUrl),
@@ -860,12 +865,14 @@ router.post('/', authMiddleware, upload.fields([
 ]), async (req, res) => {
   try {
     const { title, description, type, content, tags, category } = req.body;
-    if (!title || !type) return res.status(400).json({ error: '标题和类型为必填项' });
+    if (!type) return res.status(400).json({ error: '类型为必填项' });
     if (!['video', 'image', 'article'].includes(type)) return res.status(400).json({ error: '无效的类型' });
 
     const incomingFile = req.files?.video?.[0] || req.files?.image?.[0] || req.files?.document?.[0];
+    const resolvedTitle = String(title || '').trim() || fileNameWithoutExtension(incomingFile?.originalname);
+    if (!resolvedTitle) return res.status(400).json({ error: '无法从文件名生成标题，请手动输入标题' });
     if (rejectDuplicate(res, findDuplicateWork({
-      title,
+      title: resolvedTitle,
       type,
       originalName: incomingFile?.originalname,
     }))) return;
@@ -876,7 +883,7 @@ router.post('/', authMiddleware, upload.fields([
       if (type === 'video' && req.files.video) {
         const f = req.files.video[0];
         const uploaded = await uploadVideoToStorage(f.path, f.filename, {
-          mediaName: title,
+          mediaName: resolvedTitle,
           coverFilePath: req.files.cover?.[0]?.path || '',
         });
         filePath = uploaded.url;
@@ -900,7 +907,7 @@ router.post('/', authMiddleware, upload.fields([
     }
 
     const work = db.createWork({
-      title, description: description || '', type,
+      title: resolvedTitle, description: description || '', type,
       file_path: filePath, content: content || '', thumbnail,
       vod_file_id: vodFileId,
       tags: typeof tags === 'string' ? JSON.parse(tags) : (tags || []),

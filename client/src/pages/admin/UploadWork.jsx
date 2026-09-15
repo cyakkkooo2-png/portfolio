@@ -311,8 +311,9 @@ export default function UploadWork() {
       await handleBatchUpload();
       return;
     }
-    if (!title.trim()) return setError('请输入标题');
     if (!file) return setError('请选择文件');
+
+    const resolvedTitle = title.trim() || fileNameWithoutExtension(file.name).trim() || file.name;
 
     setUploading(true);
     setError('');
@@ -321,7 +322,7 @@ export default function UploadWork() {
 
     try {
       const formData = new FormData();
-      formData.append('title', title);
+      formData.append('title', resolvedTitle);
       formData.append('description', description);
       formData.append('type', type);
       formData.append('content', content);
@@ -340,7 +341,7 @@ export default function UploadWork() {
           videoFile: file,
           coverFile: coverToUpload,
           metadata: {
-            title: title.trim(),
+            title: resolvedTitle,
             description,
             content,
             tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
@@ -435,8 +436,8 @@ export default function UploadWork() {
 
           <div className="space-y-5">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">标题 *</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder={type === 'video' && batchFiles.length > 1 ? '批量上传时，自动使用每个视频的文件名' : '输入标题'} required={!(type === 'video' && batchFiles.length > 1)} disabled={type === 'video' && batchFiles.length > 1} />
+              <label className="mb-1 block text-sm font-medium text-gray-700">标题（选填）</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder={type === 'video' && batchFiles.length > 1 ? '批量上传时，自动使用每个视频的文件名' : '不填则自动使用文件名'} disabled={type === 'video' && batchFiles.length > 1} />
               {type === 'video' && batchFiles.length > 1 && <p className="mt-1 text-xs text-gray-500">批量上传会使用每个文件名作为标题，之后可以在后台逐个修改。</p>}
             </div>
 
@@ -453,7 +454,7 @@ export default function UploadWork() {
                   const selected = Array.from(e.target.files || []);
                   setFile(selected[0] || null);
                   setBatchFiles(type === 'video' ? selected : []);
-                  if (type === 'video' && selected.length === 1) setTitle(fileNameWithoutExtension(selected[0].name));
+                  if (selected.length === 1 && !title.trim()) setTitle(fileNameWithoutExtension(selected[0].name));
                 }} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
                 {type === 'video' && <p className="mt-1 text-xs text-gray-500">可按住 Ctrl 或 Shift 一次选择多个视频；系统会按顺序上传。</p>}
                 {batchFiles.length > 1 ? <p className="mt-1 text-xs font-medium text-blue-600">已选择 {batchFiles.length} 个视频，将自动以文件名作为标题。</p> : file && <p className="mt-1 text-xs text-gray-500">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}

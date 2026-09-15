@@ -131,6 +131,7 @@ export async function uploadVideoDirectToVod({
   onProgress?.({ percent: 100 });
   return completeVodUpload({
     ...metadata,
+    originalName: videoFile.name,
     fileUrl: result.video.url,
     coverUrl: result.cover?.url || '',
     fileId: result.fileId,
