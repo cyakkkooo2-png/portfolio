@@ -20,7 +20,7 @@ test('uses the same standard detail layout as every other video', () => {
 test('crops only the official page gutter without scaling the video', () => {
   assert.deepEqual(douyinFallbackFrameStyle, {
     top: '-48px',
-    left: '0',
+    left: '-12%',
     width: '152%',
     height: '1100px',
   });

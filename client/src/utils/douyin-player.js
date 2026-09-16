@@ -6,7 +6,7 @@ export function douyinPlayerUrl(videoId = '') {
 
 export const douyinFallbackFrameStyle = {
   top: '-48px',
-  left: '0',
+  left: '-12%',
   width: '152%',
   height: '1100px',
 };
