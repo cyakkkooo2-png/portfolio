@@ -4,6 +4,7 @@ import {
   douyinFallbackFrameStyle,
   douyinPlayerUrl,
   douyinStageStyle,
+  resolveDouyinAspectRatio,
 } from '../utils/douyin-player';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
@@ -84,8 +85,9 @@ export default function WorkDetailModal({ work, onClose }) {
   const linkPlatform = externalVideoPlatform(work, originalUrl);
   const douyinId = douyinVideoId(originalUrl);
   const isDouyinEmbed = isLinkOnlyVideo && Boolean(douyinId);
-  const displayRatio = isDouyinEmbed ? 3 / 4 : videoRatio;
+  const displayRatio = isDouyinEmbed ? resolveDouyinAspectRatio(work) : videoRatio;
   const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
+  const portraitModalWidth = `min(94vw, ${douyinStageStyle.maxWidth}, calc(72dvh * ${displayRatio}))`;
   const douyinVideoUrl = isDouyinEmbed ? `/api/works/${encodeURIComponent(work.id)}/douyin-video` : '';
   const douyinFallbackUrl = isDouyinEmbed ? douyinPlayerUrl(douyinId) : '';
 
@@ -116,7 +118,7 @@ export default function WorkDetailModal({ work, onClose }) {
       <div
         className="relative flex h-[92dvh] w-full flex-col overflow-hidden rounded-2xl transition-[max-width] duration-300"
         style={{
-          maxWidth: isDouyinEmbed ? douyinStageStyle.maxWidth : (portraitVideo ? 'min(94vw, 520px)' : '896px'),
+          maxWidth: isDouyinEmbed ? portraitModalWidth : (portraitVideo ? 'min(94vw, 520px)' : '896px'),
           background: '#111118',
           border: '1px solid rgba(255,255,255,0.08)',
           boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
@@ -136,7 +138,7 @@ export default function WorkDetailModal({ work, onClose }) {
           className="w-full shrink-0 overflow-hidden"
           style={{
             background: '#080810',
-            aspectRatio: isDouyinEmbed ? douyinStageStyle.aspectRatio : (work.type === 'video' ? displayRatio : '16 / 9'),
+            aspectRatio: work.type === 'video' ? displayRatio : '16 / 9',
             maxHeight: work.type === 'article' ? '34vh' : (portraitVideo ? '72dvh' : '62dvh'),
           }}
         >
