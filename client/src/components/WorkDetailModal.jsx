@@ -163,7 +163,11 @@ export default function WorkDetailModal({ work, onClose }) {
                   src={douyinFallbackUrl}
                   title={work.title || '抖音视频'}
                   className="absolute border-0"
-                  style={douyinFallbackFrameStyle(douyinFrameScale, douyinPlayerSize.height)}
+                  style={douyinFallbackFrameStyle(
+                    douyinFrameScale,
+                    douyinPlayerSize.height,
+                    douyinPlayerSize.cropTop,
+                  )}
                   allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
                   allowFullScreen
                   referrerPolicy="strict-origin-when-cross-origin"

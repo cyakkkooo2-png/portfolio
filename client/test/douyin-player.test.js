@@ -28,11 +28,17 @@ test('uses stored video dimensions and falls back to the usual vertical ratio', 
   assert.equal(resolveDouyinAspectRatio({}), 9 / 16);
 });
 
-test('fits the complete official player and excludes its 48px promotion footer', () => {
+test('crops the official embed to the source video canvas', () => {
   const player = resolveDouyinPlayerSize({ video_width: 1080, video_height: 1920 });
-  assert.deepEqual(player, { width: 324, height: 672, ratio: 324 / 672 });
-  assert.deepEqual(douyinFallbackFrameStyle(1.5, player.height), {
-    top: '0',
+  assert.deepEqual(player, {
+    width: 324,
+    height: 672,
+    mediaHeight: 576,
+    cropTop: 24,
+    ratio: 9 / 16,
+  });
+  assert.deepEqual(douyinFallbackFrameStyle(1.5, player.height, player.cropTop), {
+    top: '-36px',
     left: '0',
     width: '324px',
     height: '720px',

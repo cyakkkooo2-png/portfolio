@@ -28,17 +28,20 @@ export function resolveDouyinAspectRatio(work = {}) {
 
 export function resolveDouyinPlayerSize(work = {}) {
   const mediaRatio = resolveDouyinAspectRatio(work);
-  const height = (DOUYIN_PLAYER_WIDTH / mediaRatio) + DOUYIN_PLAYER_EXTRA_HEIGHT;
+  const mediaHeight = DOUYIN_PLAYER_WIDTH / mediaRatio;
+  const height = mediaHeight + DOUYIN_PLAYER_EXTRA_HEIGHT;
   return {
     width: DOUYIN_PLAYER_WIDTH,
     height,
-    ratio: DOUYIN_PLAYER_WIDTH / height,
+    mediaHeight,
+    cropTop: DOUYIN_PLAYER_EXTRA_HEIGHT / 4,
+    ratio: mediaRatio,
   };
 }
 
-export function douyinFallbackFrameStyle(scale, playerHeight) {
+export function douyinFallbackFrameStyle(scale, playerHeight, cropTop = 0) {
   return {
-    top: '0',
+    top: `${-(cropTop * scale)}px`,
     left: '0',
     width: `${DOUYIN_PLAYER_WIDTH}px`,
     height: `${playerHeight + 48}px`,
