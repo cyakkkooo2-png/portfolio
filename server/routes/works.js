@@ -310,6 +310,36 @@ function isBilibiliUrl(url = '') {
   return /(^|\.)bilibili\.com|b23\.tv/i.test(url);
 }
 
+function extractSharedUrl(value = '') {
+  const match = String(value || '').match(/https?:\/\/[^\s<>"']+/i);
+  return (match?.[0] || String(value || '').trim()).replace(/[，。！？、；：）】》]+$/u, '');
+}
+
+function isDouyinUrl(url = '') {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname === 'douyin.com'
+      || hostname.endsWith('.douyin.com')
+      || hostname === 'iesdouyin.com'
+      || hostname.endsWith('.iesdouyin.com');
+  } catch {
+    return false;
+  }
+}
+
+function pickMetaContent(html = '', keys = []) {
+  const wanted = new Set(keys.map((key) => key.toLowerCase()));
+  for (const tag of String(html).match(/<meta\b[^>]*>/gi) || []) {
+    const attributes = {};
+    for (const match of tag.matchAll(/([:\w-]+)\s*=\s*(["'])([\s\S]*?)\2/g)) {
+      attributes[match[1].toLowerCase()] = decodeHtml(match[3]);
+    }
+    const key = String(attributes.property || attributes.name || attributes.itemprop || '').toLowerCase();
+    if (wanted.has(key) && attributes.content) return attributes.content.trim();
+  }
+  return '';
+}
+
 function normalizeMediaUrl(url = '', baseUrl = '') {
   let value = decodeHtml(url)
     .replace(/\\u002[fF]/g, '/')
@@ -349,9 +379,9 @@ async function fetchHtml(url) {
   const type = response.headers.get('content-type') || '';
   const charset = /charset=([^;]+)/i.exec(type)?.[1] || /<meta[^>]+charset=["']?([^"'\s/>]+)/i.exec(buffer.toString('latin1'))?.[1] || 'utf-8';
   try {
-    return new TextDecoder(charset.toLowerCase()).decode(buffer);
+    return { html: new TextDecoder(charset.toLowerCase()).decode(buffer), finalUrl: response.url || url };
   } catch {
-    return buffer.toString('utf8');
+    return { html: buffer.toString('utf8'), finalUrl: response.url || url };
   }
 }
 
@@ -388,31 +418,37 @@ async function fetchBilibiliMeta(inputUrl, html) {
 }
 
 async function extractFromUrl(inputUrl, options = {}) {
-  let pageUrl = inputUrl.trim();
+  let pageUrl = extractSharedUrl(inputUrl);
   if (!/^https?:\/\//i.test(pageUrl)) throw new Error('请输入完整链接，例如 https://...');
 
   const pcVideoId = /pconline\.pcvideo\.com\.cn\/video-(\d+)\.html/i.exec(pageUrl)?.[1];
   if (pcVideoId) pageUrl = `https://mpconline.pcvideo.com.cn/${pcVideoId}.html`;
 
-  const html = await fetchHtml(pageUrl);
-  const sourceUrl = pageUrl;
+  const fetchedPage = await fetchHtml(pageUrl);
+  const html = fetchedPage.html;
+  const sourceUrl = fetchedPage.finalUrl || pageUrl;
   const structuredArticle = findStructuredArticle(html);
   const isBilibili = isBilibiliUrl(inputUrl) || isBilibiliUrl(pageUrl);
+  const isDouyin = isDouyinUrl(pageUrl) || isDouyinUrl(sourceUrl);
   const bilibiliMeta = isBilibili ? await fetchBilibiliMeta(inputUrl, html).catch((err) => {
     console.warn('Bilibili API fallback failed:', err.message);
     return null;
   }) : null;
-  const title = pick(html, [
+  const douyinDescription = isDouyin ? pick(html, [
+    /"desc"\s*:\s*"((?:\\.|[^"\\])*)"/i,
+    /"seoTitle"\s*:\s*"((?:\\.|[^"\\])*)"/i,
+  ]).replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => String.fromCharCode(parseInt(code, 16))).replace(/\\n/g, ' ').replace(/\\"/g, '"').trim() : '';
+  const title = (isDouyin ? pickMetaContent(html, ['og:title', 'twitter:title']) : '') || pick(html, [
     /<p[^>]+class=["'][^"']*\btit\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i,
     /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
     /<title[^>]*>([\s\S]*?)<\/title>/i,
-  ]).replace(/[-_]?太平洋科技视频?$|[-_]?太平洋科技$/g, '').trim();
-  const description = pick(html, [
+  ]).replace(/[-_]?太平洋科技视频?$|[-_]?太平洋科技$|\s*[-_|]\s*抖音.*$/g, '').trim();
+  const description = (isDouyin ? (pickMetaContent(html, ['og:description', 'description']) || douyinDescription) : '') || pick(html, [
     /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
     /<p[^>]+class=["'][^"']*\bdesc\b[^"']*["'][^>]*>[\s\S]*?<span[^>]*>[^<]*<\/span>([\s\S]*?)<\/p>/i,
     /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,
   ]);
-  const thumbnail = bilibiliMeta?.thumbnail || normalizeMediaUrl(pick(html, [
+  const thumbnail = bilibiliMeta?.thumbnail || normalizeMediaUrl((isDouyin ? pickMetaContent(html, ['og:image', 'twitter:image']) : '') || pick(html, [
     /<video[^>]+poster=["']([^"']+)["']/i,
     /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
     /<meta[^>]+itemprop=["']image["'][^>]+content=["']([^"']+)["']/i,
@@ -426,8 +462,8 @@ async function extractFromUrl(inputUrl, options = {}) {
   ]);
   const tags = pickAll(html, /<span[^>]+class=["'][^"']*\btag\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi);
   const forceType = ['video', 'article'].includes(options.type) ? options.type : '';
-  const resolvedType = forceType || ((videoUrl || isBilibili) ? 'video' : 'article');
-  const resolvedVideoUrl = resolvedType === 'video' && !isBilibili ? videoUrl : '';
+  const resolvedType = forceType || ((videoUrl || isBilibili || isDouyin) ? 'video' : 'article');
+  const resolvedVideoUrl = resolvedType === 'video' && !isBilibili && !isDouyin ? videoUrl : '';
   const articleHtml = resolvedType === 'article' ? extractArticleHtml(html, sourceUrl) : '';
   const manualArticleContent = String(options.content || '').trim();
   const articleContent = resolvedType === 'article'
@@ -435,14 +471,16 @@ async function extractFromUrl(inputUrl, options = {}) {
     : '';
 
   return {
-    title: bilibiliMeta?.title || title || '未命名作品',
+    title: bilibiliMeta?.title || douyinDescription || title || '抖音视频',
     description: bilibiliMeta?.description || description,
     type: resolvedType,
     file_path: resolvedVideoUrl,
     thumbnail,
     content: resolvedType === 'article' ? (articleContent || description || bilibiliMeta?.description || '') : '',
-    tags: isBilibili ? Array.from(new Set(['B站', ...(bilibiliMeta?.tags || []), ...tags])) : tags,
-    source_url: inputUrl.trim(),
+    tags: isBilibili
+      ? Array.from(new Set(['B站', ...(bilibiliMeta?.tags || []), ...tags]))
+      : (isDouyin ? Array.from(new Set(['抖音', ...tags])) : tags),
+    source_url: pageUrl,
     external_url: sourceUrl,
     // Keep imported articles fully inside this site. Structured data wins when a page provides it.
     ...(resolvedType === 'article' ? {
