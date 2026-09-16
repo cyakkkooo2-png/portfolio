@@ -9,6 +9,7 @@ const { authMiddleware, optionalAuthMiddleware } = require('../middleware/auth')
 const githubStorage = require('../github-storage');
 const cosStorage = require('../cos-storage');
 const vodStorage = require('../vod-storage');
+const { extractDouyinVideoId, extractDouyinMedia } = require('../douyin-media');
 const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
 
 const router = express.Router();
@@ -341,6 +342,8 @@ function pickMetaContent(html = '', keys = []) {
 }
 
 function extractDouyinAspectRatio(html = '') {
+  const media = extractDouyinMedia(html);
+  if (media?.ratio) return media.ratio;
   const source = String(html || '');
   const patterns = [
     /"video"\s*:\s*\{[\s\S]{0,12000}?"width"\s*:\s*(\d+)[\s\S]{0,500}?"height"\s*:\s*(\d+)/i,
@@ -355,6 +358,37 @@ function extractDouyinAspectRatio(html = '') {
     if (ratio > 0.3 && ratio < 3) return Number(ratio.toFixed(4));
   }
   return null;
+}
+
+const douyinMediaCache = new Map();
+
+async function fetchDouyinMedia(work) {
+  const id = extractDouyinVideoId(`${work.external_url || ''} ${work.source_url || ''}`);
+  if (!id) throw new Error('未找到抖音视频编号');
+
+  const cached = douyinMediaCache.get(id);
+  if (cached && cached.expiresAt > Date.now()) return cached.media;
+
+  const candidates = [
+    work.external_url,
+    work.source_url,
+    `https://www.iesdouyin.com/share/video/${id}/`,
+    `https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids=${id}`,
+  ].filter(Boolean);
+  let lastError = null;
+  for (const url of [...new Set(candidates)]) {
+    try {
+      const { html } = await fetchHtml(url);
+      const media = extractDouyinMedia(html);
+      if (media?.url) {
+        douyinMediaCache.set(id, { media, expiresAt: Date.now() + 10 * 60 * 1000 });
+        return media;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw new Error(lastError?.message || '抖音没有返回可播放的视频流');
 }
 
 function normalizeMediaUrl(url = '', baseUrl = '') {
@@ -841,6 +875,54 @@ router.get('/proxy-image', async (req, res) => {
   } catch (err) {
     console.error('Proxy image error:', err);
     res.status(500).send('Image proxy failed');
+  }
+});
+
+// Play an imported Douyin item as a normal site video. The real media URL is
+// resolved on the server and proxied so the browser never loads Douyin's page UI.
+router.get('/:id/douyin-video', async (req, res) => {
+  try {
+    const work = db.getWorkById(req.params.id);
+    if (!work || work.type !== 'video') return res.status(404).send('Video not found');
+    if (!isDouyinUrl(work.external_url) && !isDouyinUrl(work.source_url)) {
+      return res.status(400).send('Not a Douyin video');
+    }
+
+    const media = await fetchDouyinMedia(work);
+    const upstream = await fetch(media.url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
+        Accept: req.get('accept') || 'video/mp4,video/*;q=0.9,*/*;q=0.8',
+        Range: req.get('range') || '',
+        Referer: 'https://www.douyin.com/',
+      },
+      redirect: 'follow',
+    });
+    if (!upstream.ok && upstream.status !== 206) {
+      douyinMediaCache.delete(extractDouyinVideoId(work.external_url || work.source_url));
+      return res.status(upstream.status).send('Douyin video source unavailable');
+    }
+
+    res.status(upstream.status);
+    ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control', 'last-modified', 'etag'].forEach((name) => {
+      const value = upstream.headers.get(name);
+      if (value) res.setHeader(name, value);
+    });
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (!upstream.body) return res.end();
+
+    const upstreamStream = Readable.fromWeb(upstream.body);
+    upstreamStream.on('error', (err) => {
+      console.error('Douyin stream error:', err.message);
+      if (!res.headersSent) res.status(502).send('Douyin stream disconnected');
+      else res.destroy(err);
+    });
+    res.on('close', () => upstreamStream.destroy());
+    upstreamStream.pipe(res);
+  } catch (err) {
+    console.error('Douyin video proxy error:', err.message);
+    res.status(502).send('抖音视频流暂时无法读取');
   }
 });
 

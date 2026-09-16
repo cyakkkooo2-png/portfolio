@@ -62,6 +62,7 @@ function createWork(data) {
     thumbnail: data.thumbnail || '',
     source_url: data.source_url || '',
     external_url: data.external_url || '',
+    video_aspect_ratio: Number(data.video_aspect_ratio) || null,
     tags: data.tags || [],
     category: data.type === 'video' ? (data.category || '') : '',
     hidden: Boolean(data.hidden),

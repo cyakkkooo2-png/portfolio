@@ -84,10 +84,7 @@ export default function WorkDetailModal({ work, onClose }) {
     : 9 / 16;
   const displayRatio = isDouyinEmbed ? embedRatio : videoRatio;
   const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
-  const douyinEmbedUrl = isDouyinEmbed
-    ? `https://open.douyin.com/player/video?vid=${encodeURIComponent(douyinId)}&autoplay=1`
-    : '';
-  const douyinFrameRatio = portraitVideo ? 0.468 : Math.min(1.72, Math.max(1.2, embedRatio * 0.9));
+  const douyinVideoUrl = isDouyinEmbed ? `/api/works/${encodeURIComponent(work.id)}/douyin-video` : '';
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -116,24 +113,21 @@ export default function WorkDetailModal({ work, onClose }) {
         <div
           className="relative overflow-hidden rounded-2xl bg-black"
           style={{
-            width: portraitVideo
-              ? 'min(94vw, 334px, calc(92dvh * 0.468))'
-              : `min(96vw, 960px, calc(90dvh * ${douyinFrameRatio}))`,
+            width: 'min(94vw, 600px, calc(92dvh * 0.75))',
             maxHeight: '92dvh',
-            aspectRatio: String(douyinFrameRatio),
+            aspectRatio: '3 / 4',
             border: '1px solid rgba(255,255,255,0.1)',
             boxShadow: '0 24px 80px rgba(0,0,0,0.65)',
             animation: 'fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <iframe
-            src={douyinEmbedUrl}
+          <VideoPlayer
+            src={douyinVideoUrl}
             title={work.title || '抖音视频'}
-            className="absolute inset-0 h-full w-full border-0 bg-black"
-            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
+            autoPlay
+            containerClassName="absolute inset-0 h-full w-full overflow-hidden bg-black"
+            className="h-full w-full object-cover"
           />
           <button
             type="button"

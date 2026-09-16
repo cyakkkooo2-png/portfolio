@@ -10,6 +10,7 @@ export default function VideoPlayer({
   onCanPlay,
   onError,
   qualityControlTargetRef,
+  autoPlay = false,
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -178,7 +179,7 @@ export default function VideoPlayer({
         onMouseEnter={showControlsTemporarily}
         onTouchStart={showControlsTemporarily}
       >
-        <video ref={videoRef} controls className={className} title={title} preload="metadata" onLoadedMetadata={onLoadedMetadata} onCanPlay={onCanPlay} onError={onError} onPlay={handlePlay} onPause={handlePause}>
+        <video ref={videoRef} controls autoPlay={autoPlay} playsInline className={className} title={title} preload="metadata" onLoadedMetadata={onLoadedMetadata} onCanPlay={onCanPlay} onError={onError} onPlay={handlePlay} onPause={handlePause}>
           您的浏览器不支持视频播放
         </video>
         {!qualityControlTargetRef?.current && qualityControl}
