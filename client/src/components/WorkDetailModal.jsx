@@ -87,6 +87,7 @@ export default function WorkDetailModal({ work, onClose }) {
   const douyinEmbedUrl = isDouyinEmbed
     ? `https://open.douyin.com/player/video?vid=${encodeURIComponent(douyinId)}&autoplay=1`
     : '';
+  const douyinFrameRatio = portraitVideo ? 0.456 : Math.min(1.72, Math.max(1.2, embedRatio * 0.9));
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -104,6 +105,49 @@ export default function WorkDetailModal({ work, onClose }) {
   }, [work?.id]);
 
   if (!work) return null;
+
+  if (isDouyinEmbed) {
+    return (
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4"
+        style={{ background: 'rgba(0,0,0,0.94)', backdropFilter: 'blur(16px)', animation: 'fadeIn 0.25s ease' }}
+        onClick={onClose}
+      >
+        <div
+          className="relative overflow-hidden rounded-2xl bg-black"
+          style={{
+            width: portraitVideo
+              ? 'min(94vw, 380px, calc(92dvh * 0.456))'
+              : `min(96vw, 960px, calc(90dvh * ${douyinFrameRatio}))`,
+            maxHeight: '92dvh',
+            aspectRatio: String(douyinFrameRatio),
+            border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.65)',
+            animation: 'fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <iframe
+            src={douyinEmbedUrl}
+            title={work.title || '抖音视频'}
+            className="absolute inset-0 h-full w-full border-0 bg-black"
+            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="关闭视频"
+            className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full text-white transition hover:scale-105"
+            style={{ background: 'rgba(0,0,0,0.72)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)' }}
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -138,16 +182,7 @@ export default function WorkDetailModal({ work, onClose }) {
             maxHeight: work.type === 'article' ? '34vh' : (portraitVideo ? '72dvh' : '62dvh'),
           }}
         >
-          {work.type === 'video' && isDouyinEmbed ? (
-            <iframe
-              src={douyinEmbedUrl}
-              title={work.title || '抖音视频'}
-              className="h-full w-full border-0 bg-black"
-              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          ) : work.type === 'video' && isLinkOnlyVideo ? (
+          {work.type === 'video' && isLinkOnlyVideo ? (
             <div className="relative h-full w-full">
               {work.thumbnail ? (
                 <img src={assetUrl(work.thumbnail)} alt={work.title} className="h-full w-full object-cover" />
