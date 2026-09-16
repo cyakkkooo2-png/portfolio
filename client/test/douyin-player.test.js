@@ -10,18 +10,18 @@ test('builds the official autoplay fallback URL from a video id', () => {
   );
 });
 
-test('uses the same standard detail layout as every other video', () => {
+test('uses a portrait detail layout that matches the complete Douyin video', () => {
   assert.deepEqual(douyinStageStyle, {
-    maxWidth: '896px',
-    aspectRatio: '16 / 9',
+    maxWidth: '520px',
+    aspectRatio: '9 / 16',
   });
 });
 
-test('crops only the official page gutter without scaling the video', () => {
+test('fills the portrait stage while cropping only the official page chrome', () => {
   assert.deepEqual(douyinFallbackFrameStyle, {
     top: '-48px',
-    left: '-12%',
+    left: '0',
     width: '152%',
-    height: '1100px',
+    height: 'calc(100% + 48px)',
   });
 });

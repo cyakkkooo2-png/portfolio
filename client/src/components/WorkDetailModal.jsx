@@ -84,7 +84,7 @@ export default function WorkDetailModal({ work, onClose }) {
   const linkPlatform = externalVideoPlatform(work, originalUrl);
   const douyinId = douyinVideoId(originalUrl);
   const isDouyinEmbed = isLinkOnlyVideo && Boolean(douyinId);
-  const displayRatio = isDouyinEmbed ? 16 / 9 : videoRatio;
+  const displayRatio = isDouyinEmbed ? 9 / 16 : videoRatio;
   const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
   const douyinVideoUrl = isDouyinEmbed ? `/api/works/${encodeURIComponent(work.id)}/douyin-video` : '';
   const douyinFallbackUrl = isDouyinEmbed ? douyinPlayerUrl(douyinId) : '';
@@ -141,7 +141,7 @@ export default function WorkDetailModal({ work, onClose }) {
           }}
         >
           {work.type === 'video' && isDouyinEmbed ? (
-            <div className="relative h-full w-full overflow-hidden" style={{ background: '#303030' }}>
+            <div className="relative h-full w-full overflow-hidden" style={{ background: '#111118' }}>
               {douyinStreamFailed ? (
                 <iframe
                   src={douyinFallbackUrl}
@@ -159,7 +159,7 @@ export default function WorkDetailModal({ work, onClose }) {
                   autoPlay
                   onError={() => setDouyinStreamFailed(true)}
                   containerClassName="absolute inset-0 h-full w-full overflow-hidden"
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
               )}
             </div>

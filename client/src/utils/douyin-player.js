@@ -6,12 +6,12 @@ export function douyinPlayerUrl(videoId = '') {
 
 export const douyinFallbackFrameStyle = {
   top: '-48px',
-  left: '-12%',
+  left: '0',
   width: '152%',
-  height: '1100px',
+  height: 'calc(100% + 48px)',
 };
 
 export const douyinStageStyle = {
-  maxWidth: '896px',
-  aspectRatio: '16 / 9',
+  maxWidth: '520px',
+  aspectRatio: '9 / 16',
 };
