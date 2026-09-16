@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import VideoPlayer from './VideoPlayer';
+import { douyinPlayerUrl } from '../utils/douyin-player';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
 
@@ -69,6 +70,7 @@ export default function WorkDetailModal({ work, onClose }) {
   const acc = '#ff6600';
   const [videoRatio, setVideoRatio] = useState(16 / 9);
   const [videoError, setVideoError] = useState(false);
+  const [douyinStreamFailed, setDouyinStreamFailed] = useState(false);
   const qualityControlTargetRef = useRef(null);
   const isExternalVideo = work?.type === 'video'
     && /^https?:\/\//i.test(work?.file_path || '')
@@ -85,6 +87,7 @@ export default function WorkDetailModal({ work, onClose }) {
   const displayRatio = isDouyinEmbed ? embedRatio : videoRatio;
   const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
   const douyinVideoUrl = isDouyinEmbed ? `/api/works/${encodeURIComponent(work.id)}/douyin-video` : '';
+  const douyinFallbackUrl = isDouyinEmbed ? douyinPlayerUrl(douyinId) : '';
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -99,6 +102,7 @@ export default function WorkDetailModal({ work, onClose }) {
   useEffect(() => {
     setVideoRatio(16 / 9);
     setVideoError(false);
+    setDouyinStreamFailed(false);
   }, [work?.id]);
 
   if (!work) return null;
@@ -113,7 +117,7 @@ export default function WorkDetailModal({ work, onClose }) {
         <div
           className="relative overflow-hidden rounded-2xl bg-black"
           style={{
-            width: 'min(94vw, 600px, calc(92dvh * 0.75))',
+            width: 'min(94vw, 490px, calc(92dvh * 0.75))',
             maxHeight: '92dvh',
             aspectRatio: '3 / 4',
             border: '1px solid rgba(255,255,255,0.1)',
@@ -122,13 +126,26 @@ export default function WorkDetailModal({ work, onClose }) {
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <VideoPlayer
-            src={douyinVideoUrl}
-            title={work.title || '抖音视频'}
-            autoPlay
-            containerClassName="absolute inset-0 h-full w-full overflow-hidden bg-black"
-            className="h-full w-full object-cover"
-          />
+          {douyinStreamFailed ? (
+            <iframe
+              src={douyinFallbackUrl}
+              title={work.title || '抖音视频'}
+              className="absolute left-0 w-full border-0 bg-black"
+              style={{ top: '-48px', height: '1100px' }}
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : (
+            <VideoPlayer
+              src={douyinVideoUrl}
+              title={work.title || '抖音视频'}
+              autoPlay
+              onError={() => setDouyinStreamFailed(true)}
+              containerClassName="absolute inset-0 h-full w-full overflow-hidden bg-black"
+              className="h-full w-full object-cover"
+            />
+          )}
           <button
             type="button"
             onClick={onClose}
