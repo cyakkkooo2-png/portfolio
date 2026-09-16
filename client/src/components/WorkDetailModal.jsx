@@ -4,7 +4,7 @@ import {
   douyinFallbackFrameStyle,
   douyinPlayerUrl,
   douyinStageStyle,
-  resolveDouyinAspectRatio,
+  resolveDouyinPlayerSize,
 } from '../utils/douyin-player';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
@@ -76,6 +76,8 @@ export default function WorkDetailModal({ work, onClose }) {
   const [videoRatio, setVideoRatio] = useState(16 / 9);
   const [videoError, setVideoError] = useState(false);
   const [douyinStreamFailed, setDouyinStreamFailed] = useState(false);
+  const [douyinFrameScale, setDouyinFrameScale] = useState(1);
+  const douyinStageRef = useRef(null);
   const qualityControlTargetRef = useRef(null);
   const isExternalVideo = work?.type === 'video'
     && /^https?:\/\//i.test(work?.file_path || '')
@@ -85,7 +87,8 @@ export default function WorkDetailModal({ work, onClose }) {
   const linkPlatform = externalVideoPlatform(work, originalUrl);
   const douyinId = douyinVideoId(originalUrl);
   const isDouyinEmbed = isLinkOnlyVideo && Boolean(douyinId);
-  const displayRatio = isDouyinEmbed ? resolveDouyinAspectRatio(work) : videoRatio;
+  const douyinPlayerSize = resolveDouyinPlayerSize(work);
+  const displayRatio = isDouyinEmbed ? douyinPlayerSize.ratio : videoRatio;
   const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
   const portraitModalWidth = `min(94vw, ${douyinStageStyle.maxWidth}, calc(72dvh * ${displayRatio}))`;
   const douyinVideoUrl = isDouyinEmbed ? `/api/works/${encodeURIComponent(work.id)}/douyin-video` : '';
@@ -106,6 +109,16 @@ export default function WorkDetailModal({ work, onClose }) {
     setVideoError(false);
     setDouyinStreamFailed(false);
   }, [work?.id]);
+
+  useEffect(() => {
+    if (!isDouyinEmbed || !douyinStageRef.current) return undefined;
+    const stage = douyinStageRef.current;
+    const updateScale = () => setDouyinFrameScale(stage.clientWidth / douyinPlayerSize.width);
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, [isDouyinEmbed, douyinPlayerSize.width, work?.id]);
 
   if (!work) return null;
 
@@ -135,6 +148,7 @@ export default function WorkDetailModal({ work, onClose }) {
         </button>
 
         <div
+          ref={douyinStageRef}
           className="w-full shrink-0 overflow-hidden"
           style={{
             background: '#080810',
@@ -149,7 +163,7 @@ export default function WorkDetailModal({ work, onClose }) {
                   src={douyinFallbackUrl}
                   title={work.title || '抖音视频'}
                   className="absolute border-0"
-                  style={douyinFallbackFrameStyle}
+                  style={douyinFallbackFrameStyle(douyinFrameScale, douyinPlayerSize.height)}
                   allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
                   allowFullScreen
                   referrerPolicy="strict-origin-when-cross-origin"

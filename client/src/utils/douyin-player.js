@@ -4,14 +4,8 @@ export function douyinPlayerUrl(videoId = '') {
     : '';
 }
 
-export const douyinFallbackFrameStyle = {
-  top: '-259px',
-  left: '-50px',
-  width: '100%',
-  height: 'calc(100% + 259px)',
-  transform: 'scale(1.93)',
-  transformOrigin: 'top left',
-};
+export const DOUYIN_PLAYER_WIDTH = 324;
+export const DOUYIN_PLAYER_EXTRA_HEIGHT = 96;
 
 export const douyinStageStyle = {
   maxWidth: '520px',
@@ -30,4 +24,25 @@ export function resolveDouyinAspectRatio(work = {}) {
 
   const numericRatio = Number(rawRatio);
   return Number.isFinite(numericRatio) && numericRatio > 0 ? numericRatio : 9 / 16;
+}
+
+export function resolveDouyinPlayerSize(work = {}) {
+  const mediaRatio = resolveDouyinAspectRatio(work);
+  const height = (DOUYIN_PLAYER_WIDTH / mediaRatio) + DOUYIN_PLAYER_EXTRA_HEIGHT;
+  return {
+    width: DOUYIN_PLAYER_WIDTH,
+    height,
+    ratio: DOUYIN_PLAYER_WIDTH / height,
+  };
+}
+
+export function douyinFallbackFrameStyle(scale, playerHeight) {
+  return {
+    top: '0',
+    left: '0',
+    width: `${DOUYIN_PLAYER_WIDTH}px`,
+    height: `${playerHeight + 48}px`,
+    transform: `scale(${scale})`,
+    transformOrigin: 'top left',
+  };
 }

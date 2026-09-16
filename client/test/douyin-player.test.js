@@ -6,6 +6,7 @@ import {
   douyinPlayerUrl,
   douyinStageStyle,
   resolveDouyinAspectRatio,
+  resolveDouyinPlayerSize,
 } from '../src/utils/douyin-player.js';
 
 test('builds the official autoplay fallback URL from a video id', () => {
@@ -27,13 +28,15 @@ test('uses stored video dimensions and falls back to the usual vertical ratio', 
   assert.equal(resolveDouyinAspectRatio({}), 9 / 16);
 });
 
-test('fills the portrait stage while cropping only the official page chrome', () => {
-  assert.deepEqual(douyinFallbackFrameStyle, {
-    top: '-259px',
-    left: '-50px',
-    width: '100%',
-    height: 'calc(100% + 259px)',
-    transform: 'scale(1.93)',
+test('fits the complete official player and excludes its 48px promotion footer', () => {
+  const player = resolveDouyinPlayerSize({ video_width: 1080, video_height: 1920 });
+  assert.deepEqual(player, { width: 324, height: 672, ratio: 324 / 672 });
+  assert.deepEqual(douyinFallbackFrameStyle(1.5, player.height), {
+    top: '0',
+    left: '0',
+    width: '324px',
+    height: '720px',
+    transform: 'scale(1.5)',
     transformOrigin: 'top left',
   });
 });
