@@ -87,7 +87,7 @@ export default function WorkDetailModal({ work, onClose }) {
   const douyinEmbedUrl = isDouyinEmbed
     ? `https://open.douyin.com/player/video?vid=${encodeURIComponent(douyinId)}&autoplay=1`
     : '';
-  const douyinFrameRatio = portraitVideo ? 0.456 : Math.min(1.72, Math.max(1.2, embedRatio * 0.9));
+  const douyinFrameRatio = portraitVideo ? 0.468 : Math.min(1.72, Math.max(1.2, embedRatio * 0.9));
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -117,7 +117,7 @@ export default function WorkDetailModal({ work, onClose }) {
           className="relative overflow-hidden rounded-2xl bg-black"
           style={{
             width: portraitVideo
-              ? 'min(94vw, 380px, calc(92dvh * 0.456))'
+              ? 'min(94vw, 334px, calc(92dvh * 0.468))'
               : `min(96vw, 960px, calc(90dvh * ${douyinFrameRatio}))`,
             maxHeight: '92dvh',
             aspectRatio: String(douyinFrameRatio),
