@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import VideoPlayer from './VideoPlayer';
-import { douyinFallbackFrameStyle, douyinPlayerUrl } from '../utils/douyin-player';
+import {
+  douyinFallbackFrameStyle,
+  douyinPlayerUrl,
+  douyinPortraitFrameStyle,
+  douyinStageStyle,
+} from '../utils/douyin-player';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
 
@@ -115,37 +120,50 @@ export default function WorkDetailModal({ work, onClose }) {
         onClick={onClose}
       >
         <div
-          className="relative overflow-hidden rounded-2xl bg-black"
+          className="relative flex items-center justify-center overflow-hidden rounded-2xl"
           style={{
-            width: 'min(94vw, 490px, calc(92dvh * 0.75))',
-            maxHeight: '92dvh',
-            aspectRatio: '3 / 4',
+            ...douyinStageStyle,
+            background: 'radial-gradient(circle at 50% 28%, #607080 0%, #273646 38%, #572634 72%, #8b8f91 100%)',
             border: '1px solid rgba(255,255,255,0.1)',
             boxShadow: '0 24px 80px rgba(0,0,0,0.65)',
             animation: 'fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          {douyinStreamFailed ? (
-            <iframe
-              src={douyinFallbackUrl}
-              title={work.title || '抖音视频'}
-              className="absolute border-0 bg-black"
-              style={douyinFallbackFrameStyle}
-              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          ) : (
-            <VideoPlayer
-              src={douyinVideoUrl}
-              title={work.title || '抖音视频'}
-              autoPlay
-              onError={() => setDouyinStreamFailed(true)}
-              containerClassName="absolute inset-0 h-full w-full overflow-hidden bg-black"
-              className="h-full w-full object-cover"
+          {work.thumbnail && (
+            <img
+              src={assetUrl(work.thumbnail)}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full scale-125 object-cover opacity-60 blur-3xl"
             />
           )}
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.18), rgba(8,14,23,0.12) 30%, rgba(8,14,23,0.12) 70%, rgba(255,255,255,0.18))' }} />
+          <div
+            className="relative shrink-0 overflow-hidden bg-black"
+            style={{ ...douyinPortraitFrameStyle, boxShadow: '0 0 90px 35px rgba(10,18,29,0.72)' }}
+          >
+            {douyinStreamFailed ? (
+              <iframe
+                src={douyinFallbackUrl}
+                title={work.title || '抖音视频'}
+                className="absolute border-0 bg-black"
+                style={douyinFallbackFrameStyle}
+                allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            ) : (
+              <VideoPlayer
+                src={douyinVideoUrl}
+                title={work.title || '抖音视频'}
+                autoPlay
+                onError={() => setDouyinStreamFailed(true)}
+                containerClassName="absolute inset-0 h-full w-full overflow-hidden bg-black"
+                className="h-full w-full object-cover"
+              />
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
