@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getWorks, reorderWorks, toggleWorkFeatured, toggleWorkVisibility } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
+import { VIDEO_CATEGORIES } from '../utils/video-categories';
 
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
@@ -154,12 +155,6 @@ export default function WorksGrid({ onSelectWork }) {
     setLoading(true);
     getWorks().then((data) => setWorks(data.works || [])).finally(() => setLoading(false));
   }, []);
-
-  const videoCategories = useMemo(() => [...new Set(
-    works
-      .filter((work) => work.type === 'video' && work.category)
-      .map((work) => work.category)
-  )], [works]);
 
   const visibleWorks = useMemo(() => {
     let list = works;
@@ -418,7 +413,7 @@ export default function WorksGrid({ onSelectWork }) {
           })}
         </div>
 
-        {filter === 'video' && videoCategories.length > 0 && (
+        {filter === 'video' && (
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <span className="mr-1 text-xs font-semibold uppercase tracking-wider" style={{ color: '#a0a6b3' }}>分组</span>
             <button
@@ -428,7 +423,7 @@ export default function WorksGrid({ onSelectWork }) {
             >
               全部视频
             </button>
-            {videoCategories.map((category) => (
+            {VIDEO_CATEGORIES.map((category) => (
               <button
                 key={category}
                 onClick={() => setVideoCategory(category)}

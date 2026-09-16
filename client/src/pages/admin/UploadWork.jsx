@@ -4,6 +4,7 @@ import { uploadVideoDirectToVod, uploadWorkWithProgress } from '../../api';
 import ProgressBar from '../../components/ProgressBar';
 import StorageBar from '../../components/StorageBar';
 import { useAuth } from '../../context/AuthContext';
+import VideoCategoryPicker from '../../components/VideoCategoryPicker';
 
 const TYPES = [
   { key: 'video', label: '视频', icon: '🎬' },
@@ -197,14 +198,11 @@ function UrlImportCard({ onImported }) {
               </button>
             ))}
           </div>
-          {importType === 'video' && (
-            <input
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              maxLength={40}
-              placeholder="视频分组，例如：手机评测"
-              className="mt-3 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400"
-            />
+          {importType !== 'article' && (
+            <div className="mt-3">
+              <p className="mb-2 text-xs font-semibold text-gray-600">视频分类 Tag（可选）</p>
+              <VideoCategoryPicker value={category} onChange={setCategory} compact />
+            </div>
           )}
           <input
             value={url}
@@ -475,9 +473,9 @@ export default function UploadWork() {
 
             {type === 'video' && (
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">视频分组（可选）</label>
-                <input value={category} maxLength={40} onChange={(e) => setCategory(e.target.value)} className={inputClass} placeholder="例如：手机评测、旅行记录、Vlog" />
-                <p className="mt-1 text-xs text-gray-500">填写后，前台“视频”板块会自动出现这个分组。</p>
+                <label className="mb-2 block text-sm font-medium text-gray-700">视频分类 Tag（可选）</label>
+                <VideoCategoryPicker value={category} onChange={setCategory} />
+                <p className="mt-2 text-xs text-gray-500">选择后，作品会进入前台“视频”下对应的分栏；再次点击可取消。</p>
               </div>
             )}
 

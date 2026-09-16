@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getWork, uploadWorkWithProgress } from '../../api';
 import ProgressBar from '../../components/ProgressBar';
+import VideoCategoryPicker from '../../components/VideoCategoryPicker';
 
 function fileNameWithoutExtension(value = '') {
   const rawName = String(value).split('/').pop() || '';
@@ -127,8 +128,9 @@ export default function EditWork() {
           <input type="text" value={tags} onChange={e => setTags(e.target.value)} className={cls} /></div>
 
         {type === 'video' && (
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">视频分组</label>
-            <input type="text" value={category} maxLength={40} onChange={e => setCategory(e.target.value)} placeholder="例如：手机评测" className={cls} /></div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-2">视频分类 Tag</label>
+            <VideoCategoryPicker value={category} onChange={setCategory} />
+            <p className="mt-2 text-xs text-gray-500">选择后会进入前台“视频”下对应分栏。</p></div>
         )}
 
         {uploading && progress && <ProgressBar percent={progress.percent} fileName={progress.fileName} speed={progress.speed} />}

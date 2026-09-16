@@ -346,6 +346,7 @@ export default function Dashboard() {
                         <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
                           {work.type === 'video' ? '视频' : work.type === 'image' ? '图片' : '文章'}
                         </span>
+                        {work.type === 'video' && work.category && <span className="ml-2 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{work.category}</span>}
                         {work.hidden && <span className="ml-2 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">已隐藏</span>}
                         {work.featured && <span className="ml-2 inline-block rounded-full bg-orange-50 px-2 py-0.5 text-xs text-orange-700">精选</span>}
                       </div>
