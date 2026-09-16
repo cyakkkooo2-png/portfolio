@@ -3,7 +3,6 @@ import VideoPlayer from './VideoPlayer';
 import {
   douyinFallbackFrameStyle,
   douyinPlayerUrl,
-  douyinPortraitFrameStyle,
   douyinStageStyle,
 } from '../utils/douyin-player';
 
@@ -85,11 +84,7 @@ export default function WorkDetailModal({ work, onClose }) {
   const linkPlatform = externalVideoPlatform(work, originalUrl);
   const douyinId = douyinVideoId(originalUrl);
   const isDouyinEmbed = isLinkOnlyVideo && Boolean(douyinId);
-  const savedRatio = Number(work?.video_aspect_ratio);
-  const embedRatio = Number.isFinite(savedRatio) && savedRatio > 0.3 && savedRatio < 3
-    ? savedRatio
-    : 9 / 16;
-  const displayRatio = isDouyinEmbed ? embedRatio : videoRatio;
+  const displayRatio = isDouyinEmbed ? 16 / 9 : videoRatio;
   const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
   const douyinVideoUrl = isDouyinEmbed ? `/api/works/${encodeURIComponent(work.id)}/douyin-video` : '';
   const douyinFallbackUrl = isDouyinEmbed ? douyinPlayerUrl(douyinId) : '';
@@ -112,72 +107,6 @@ export default function WorkDetailModal({ work, onClose }) {
 
   if (!work) return null;
 
-  if (isDouyinEmbed) {
-    return (
-      <div
-        className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4"
-        style={{ background: 'rgba(0,0,0,0.94)', backdropFilter: 'blur(16px)', animation: 'fadeIn 0.25s ease' }}
-        onClick={onClose}
-      >
-        <div
-          className="relative flex items-center justify-center overflow-hidden rounded-2xl"
-          style={{
-            ...douyinStageStyle,
-            background: 'radial-gradient(circle at 50% 28%, #607080 0%, #273646 38%, #572634 72%, #8b8f91 100%)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            boxShadow: '0 24px 80px rgba(0,0,0,0.65)',
-            animation: 'fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-          }}
-          onClick={(event) => event.stopPropagation()}
-        >
-          {work.thumbnail && (
-            <img
-              src={assetUrl(work.thumbnail)}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 h-full w-full scale-125 object-cover opacity-60 blur-3xl"
-            />
-          )}
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.18), rgba(8,14,23,0.12) 30%, rgba(8,14,23,0.12) 70%, rgba(255,255,255,0.18))' }} />
-          <div
-            className="relative shrink-0 overflow-hidden bg-black"
-            style={{ ...douyinPortraitFrameStyle, boxShadow: '0 0 90px 35px rgba(10,18,29,0.72)' }}
-          >
-            {douyinStreamFailed ? (
-              <iframe
-                src={douyinFallbackUrl}
-                title={work.title || '抖音视频'}
-                className="absolute border-0 bg-black"
-                style={douyinFallbackFrameStyle}
-                allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-                allowFullScreen
-                referrerPolicy="strict-origin-when-cross-origin"
-              />
-            ) : (
-              <VideoPlayer
-                src={douyinVideoUrl}
-                title={work.title || '抖音视频'}
-                autoPlay
-                onError={() => setDouyinStreamFailed(true)}
-                containerClassName="absolute inset-0 h-full w-full overflow-hidden bg-black"
-                className="h-full w-full object-cover"
-              />
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="关闭视频"
-            className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full text-white transition hover:scale-105"
-            style={{ background: 'rgba(0,0,0,0.72)', border: '1px solid rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)' }}
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8"
@@ -187,7 +116,7 @@ export default function WorkDetailModal({ work, onClose }) {
       <div
         className="relative flex h-[92dvh] w-full flex-col overflow-hidden rounded-2xl transition-[max-width] duration-300"
         style={{
-          maxWidth: portraitVideo ? 'min(94vw, 520px)' : '896px',
+          maxWidth: isDouyinEmbed ? douyinStageStyle.maxWidth : (portraitVideo ? 'min(94vw, 520px)' : '896px'),
           background: '#111118',
           border: '1px solid rgba(255,255,255,0.08)',
           boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
@@ -207,11 +136,34 @@ export default function WorkDetailModal({ work, onClose }) {
           className="w-full shrink-0 overflow-hidden"
           style={{
             background: '#080810',
-            aspectRatio: work.type === 'video' ? displayRatio : '16 / 9',
+            aspectRatio: isDouyinEmbed ? douyinStageStyle.aspectRatio : (work.type === 'video' ? displayRatio : '16 / 9'),
             maxHeight: work.type === 'article' ? '34vh' : (portraitVideo ? '72dvh' : '62dvh'),
           }}
         >
-          {work.type === 'video' && isLinkOnlyVideo ? (
+          {work.type === 'video' && isDouyinEmbed ? (
+            <div className="relative h-full w-full overflow-hidden" style={{ background: '#303030' }}>
+              {douyinStreamFailed ? (
+                <iframe
+                  src={douyinFallbackUrl}
+                  title={work.title || '抖音视频'}
+                  className="absolute border-0"
+                  style={douyinFallbackFrameStyle}
+                  allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              ) : (
+                <VideoPlayer
+                  src={douyinVideoUrl}
+                  title={work.title || '抖音视频'}
+                  autoPlay
+                  onError={() => setDouyinStreamFailed(true)}
+                  containerClassName="absolute inset-0 h-full w-full overflow-hidden"
+                  className="h-full w-full object-cover"
+                />
+              )}
+            </div>
+          ) : work.type === 'video' && isLinkOnlyVideo ? (
             <div className="relative h-full w-full">
               {work.thumbnail ? (
                 <img src={assetUrl(work.thumbnail)} alt={work.title} className="h-full w-full object-cover" />

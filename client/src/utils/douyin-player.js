@@ -12,12 +12,6 @@ export const douyinFallbackFrameStyle = {
 };
 
 export const douyinStageStyle = {
-  width: 'min(96vw, 1180px, calc(90dvh * 16 / 9))',
-  maxHeight: '90dvh',
+  maxWidth: '896px',
   aspectRatio: '16 / 9',
-};
-
-export const douyinPortraitFrameStyle = {
-  height: '100%',
-  aspectRatio: '9 / 16',
 };
