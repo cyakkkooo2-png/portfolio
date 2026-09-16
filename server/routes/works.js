@@ -10,6 +10,7 @@ const githubStorage = require('../github-storage');
 const cosStorage = require('../cos-storage');
 const vodStorage = require('../vod-storage');
 const { extractDouyinVideoId, extractDouyinMedia } = require('../douyin-media');
+const { generateABogus } = require('../douyin-sign');
 const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
 
 const router = express.Router();
@@ -361,6 +362,50 @@ function extractDouyinAspectRatio(html = '') {
 }
 
 const douyinMediaCache = new Map();
+const DOUYIN_DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36';
+
+async function fetchDouyinApiMedia(id) {
+  const ttwidResponse = await fetch('https://ttwid.bytedance.com/ttwid/union/register/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': DOUYIN_DESKTOP_UA,
+    },
+    body: JSON.stringify({
+      region: 'cn', aid: 6383, need_t: 1, service: 'www.douyin.com',
+      migrate_priority: 0, cb_url_protocol: 'https', domain: '.douyin.com',
+    }),
+  });
+  const ttwid = String(ttwidResponse.headers.get('set-cookie') || '').match(/(?:^|,\s*)ttwid=([^;\s]+)/i)?.[1] || '';
+  const msTokenAlphabet = 'ABCDEFGHIGKLMNOPQRSTUVWXYZabcdefghigklmnopqrstuvwxyz0123456789=';
+  let msToken = '';
+  for (let index = 0; index < 107; index += 1) {
+    msToken += msTokenAlphabet[Math.floor(Math.random() * msTokenAlphabet.length)];
+  }
+  const params = new URLSearchParams({
+    device_platform: 'webapp',
+    aid: '6383',
+    channel: 'channel_pc_web',
+    aweme_id: id,
+    msToken,
+  });
+  params.set('a_bogus', generateABogus(params.toString(), DOUYIN_DESKTOP_UA));
+  const referer = `https://www.douyin.com/video/${id}?previous_page=web_code_link`;
+  const response = await fetch(`https://www.douyin.com/aweme/v1/web/aweme/detail/?${params}`, {
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      Referer: referer,
+      'User-Agent': DOUYIN_DESKTOP_UA,
+      Cookie: ttwid ? `ttwid=${decodeURIComponent(ttwid)}` : '',
+    },
+  });
+  if (!response.ok) throw new Error(`抖音详情接口返回 ${response.status}`);
+  const json = await response.json();
+  const media = extractDouyinMedia(JSON.stringify(json?.aweme_detail || json));
+  if (!media?.url) throw new Error('抖音详情接口未返回原视频');
+  return media;
+}
 
 async function fetchDouyinMedia(work) {
   const id = extractDouyinVideoId(`${work.external_url || ''} ${work.source_url || ''}`);
@@ -368,6 +413,14 @@ async function fetchDouyinMedia(work) {
 
   const cached = douyinMediaCache.get(id);
   if (cached && cached.expiresAt > Date.now()) return cached.media;
+
+  try {
+    const media = await fetchDouyinApiMedia(id);
+    douyinMediaCache.set(id, { media, expiresAt: Date.now() + 10 * 60 * 1000 });
+    return media;
+  } catch (err) {
+    console.warn('Douyin signed detail fallback:', err.message);
+  }
 
   const candidates = [
     work.external_url,
