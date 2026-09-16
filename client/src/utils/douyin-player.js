@@ -5,13 +5,15 @@ export function douyinPlayerUrl(videoId = '') {
 }
 
 export const douyinFallbackFrameStyle = {
-  top: '-48px',
-  left: '0',
+  top: '-259px',
+  left: '50%',
   width: '100%',
-  height: 'calc(100% + 48px)',
+  height: 'calc(100% + 259px)',
+  transform: 'translateX(-50%) scale(1.93)',
+  transformOrigin: 'top center',
 };
 
 export const douyinStageStyle = {
   maxWidth: '520px',
-  aspectRatio: '9 / 16',
+  aspectRatio: '3 / 4',
 };

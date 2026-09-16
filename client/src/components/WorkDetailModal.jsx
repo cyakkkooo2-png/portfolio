@@ -84,7 +84,7 @@ export default function WorkDetailModal({ work, onClose }) {
   const linkPlatform = externalVideoPlatform(work, originalUrl);
   const douyinId = douyinVideoId(originalUrl);
   const isDouyinEmbed = isLinkOnlyVideo && Boolean(douyinId);
-  const displayRatio = isDouyinEmbed ? 9 / 16 : videoRatio;
+  const displayRatio = isDouyinEmbed ? 3 / 4 : videoRatio;
   const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
   const douyinVideoUrl = isDouyinEmbed ? `/api/works/${encodeURIComponent(work.id)}/douyin-video` : '';
   const douyinFallbackUrl = isDouyinEmbed ? douyinPlayerUrl(douyinId) : '';
