@@ -24,13 +24,11 @@ test('uses a wide stage with a centered 9:16 portrait frame', () => {
   });
 });
 
-test('scales the official player so its right gutter and bottom banner are clipped', () => {
+test('crops only the official page gutter without scaling the video', () => {
   assert.deepEqual(douyinFallbackFrameStyle, {
     top: '-48px',
     left: '0',
-    width: '100%',
+    width: '152%',
     height: '1100px',
-    transform: 'scale(1.52)',
-    transformOrigin: 'top left',
   });
 });
