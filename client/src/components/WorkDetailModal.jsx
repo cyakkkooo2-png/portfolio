@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import VideoPlayer from './VideoPlayer';
-import { douyinPlayerUrl } from '../utils/douyin-player';
+import { douyinFallbackFrameStyle, douyinPlayerUrl } from '../utils/douyin-player';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
 
@@ -130,8 +130,8 @@ export default function WorkDetailModal({ work, onClose }) {
             <iframe
               src={douyinFallbackUrl}
               title={work.title || '抖音视频'}
-              className="absolute left-0 w-full border-0 bg-black"
-              style={{ top: '-48px', height: '1100px' }}
+              className="absolute border-0 bg-black"
+              style={douyinFallbackFrameStyle}
               allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
               allowFullScreen
               referrerPolicy="strict-origin-when-cross-origin"
