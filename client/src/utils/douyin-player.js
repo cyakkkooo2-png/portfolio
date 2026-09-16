@@ -7,7 +7,7 @@ export function douyinPlayerUrl(videoId = '') {
 export const douyinFallbackFrameStyle = {
   top: '-48px',
   left: '0',
-  width: '152%',
+  width: '100%',
   height: 'calc(100% + 48px)',
 };
 

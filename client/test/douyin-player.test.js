@@ -21,7 +21,7 @@ test('fills the portrait stage while cropping only the official page chrome', ()
   assert.deepEqual(douyinFallbackFrameStyle, {
     top: '-48px',
     left: '0',
-    width: '152%',
+    width: '100%',
     height: 'calc(100% + 48px)',
   });
 });
