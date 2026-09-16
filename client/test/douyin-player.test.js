@@ -20,10 +20,10 @@ test('uses a portrait detail layout that matches the complete Douyin video', () 
 test('fills the portrait stage while cropping only the official page chrome', () => {
   assert.deepEqual(douyinFallbackFrameStyle, {
     top: '-259px',
-    left: '50%',
+    left: '-50px',
     width: '100%',
     height: 'calc(100% + 259px)',
-    transform: 'translateX(-50%) scale(1.93)',
-    transformOrigin: 'top center',
+    transform: 'scale(1.93)',
+    transformOrigin: 'top left',
   });
 });
