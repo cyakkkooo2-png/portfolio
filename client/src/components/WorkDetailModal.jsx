@@ -41,6 +41,12 @@ function externalVideoPlatform(work, url = '') {
   return { name: '原平台', action: '打开原网页播放' };
 }
 
+function douyinVideoId(url = '') {
+  return String(url).match(/douyin\.com\/video\/(\d+)/i)?.[1]
+    || String(url).match(/[?&](?:modal_id|vid)=(\d+)/i)?.[1]
+    || '';
+}
+
 function TypeIcon({ type }) {
   const common = { className: 'h-3.5 w-3.5', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
   if (type === 'video') return <svg {...common}><path d="M5 7.5h11.5a2 2 0 0 1 2 2v6.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5a2 2 0 0 1 2-2Z" /><path d="m10 11.2 4 2.3-4 2.3v-4.6Z" /></svg>;
@@ -70,6 +76,17 @@ export default function WorkDetailModal({ work, onClose }) {
   const originalUrl = work?.external_url || work?.source_url || work?.file_path;
   const isLinkOnlyVideo = work?.type === 'video' && !work?.file_path && !!originalUrl;
   const linkPlatform = externalVideoPlatform(work, originalUrl);
+  const douyinId = douyinVideoId(originalUrl);
+  const isDouyinEmbed = isLinkOnlyVideo && Boolean(douyinId);
+  const savedRatio = Number(work?.video_aspect_ratio);
+  const embedRatio = Number.isFinite(savedRatio) && savedRatio > 0.3 && savedRatio < 3
+    ? savedRatio
+    : 9 / 16;
+  const displayRatio = isDouyinEmbed ? embedRatio : videoRatio;
+  const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
+  const douyinEmbedUrl = isDouyinEmbed
+    ? `https://open.douyin.com/player/video?vid=${encodeURIComponent(douyinId)}&autoplay=1`
+    : '';
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -95,8 +112,9 @@ export default function WorkDetailModal({ work, onClose }) {
       onClick={onClose}
     >
       <div
-        className="relative flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl"
+        className="relative flex h-[92dvh] w-full flex-col overflow-hidden rounded-2xl transition-[max-width] duration-300"
         style={{
+          maxWidth: portraitVideo ? 'min(94vw, 520px)' : '896px',
           background: '#111118',
           border: '1px solid rgba(255,255,255,0.08)',
           boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
@@ -116,11 +134,20 @@ export default function WorkDetailModal({ work, onClose }) {
           className="w-full shrink-0 overflow-hidden"
           style={{
             background: '#080810',
-            aspectRatio: work.type === 'video' ? videoRatio : '16 / 9',
-            maxHeight: work.type === 'article' ? '34vh' : '62vh',
+            aspectRatio: work.type === 'video' ? displayRatio : '16 / 9',
+            maxHeight: work.type === 'article' ? '34vh' : (portraitVideo ? '72dvh' : '62dvh'),
           }}
         >
-          {work.type === 'video' && isLinkOnlyVideo ? (
+          {work.type === 'video' && isDouyinEmbed ? (
+            <iframe
+              src={douyinEmbedUrl}
+              title={work.title || '抖音视频'}
+              className="h-full w-full border-0 bg-black"
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : work.type === 'video' && isLinkOnlyVideo ? (
             <div className="relative h-full w-full">
               {work.thumbnail ? (
                 <img src={assetUrl(work.thumbnail)} alt={work.title} className="h-full w-full object-cover" />
@@ -196,7 +223,7 @@ export default function WorkDetailModal({ work, onClose }) {
               <TypeIcon type={work.type} />
               {labels[work.type]}
             </span>
-            {work.type === 'video' && (
+            {work.type === 'video' && !isDouyinEmbed && (
               <div className="flex justify-end" ref={qualityControlTargetRef} />
             )}
           </div>
@@ -228,7 +255,7 @@ export default function WorkDetailModal({ work, onClose }) {
             </a>
           )}
 
-          {(work.external_url || work.source_url) && !isExternalVideo && work.type !== 'article' && (
+          {(work.external_url || work.source_url) && !isExternalVideo && !isDouyinEmbed && work.type !== 'article' && (
             <button
               type="button"
               onClick={() => openCurrentTab(work.external_url || work.source_url)}

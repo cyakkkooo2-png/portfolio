@@ -340,6 +340,23 @@ function pickMetaContent(html = '', keys = []) {
   return '';
 }
 
+function extractDouyinAspectRatio(html = '') {
+  const source = String(html || '');
+  const patterns = [
+    /"video"\s*:\s*\{[\s\S]{0,12000}?"width"\s*:\s*(\d+)[\s\S]{0,500}?"height"\s*:\s*(\d+)/i,
+    /"width"\s*:\s*(\d+)\s*,\s*"height"\s*:\s*(\d+)[\s\S]{0,1200}?"play_addr"/i,
+    /"play_addr"[\s\S]{0,1200}?"width"\s*:\s*(\d+)[\s\S]{0,500}?"height"\s*:\s*(\d+)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    const width = Number(match?.[1]);
+    const height = Number(match?.[2]);
+    const ratio = width && height ? width / height : 0;
+    if (ratio > 0.3 && ratio < 3) return Number(ratio.toFixed(4));
+  }
+  return null;
+}
+
 function normalizeMediaUrl(url = '', baseUrl = '') {
   let value = decodeHtml(url)
     .replace(/\\u002[fF]/g, '/')
@@ -429,6 +446,7 @@ async function extractFromUrl(inputUrl, options = {}) {
   const sourceUrl = fetchedPage.finalUrl || pageUrl;
   const structuredArticle = findStructuredArticle(html);
   const isDouyin = isDouyinUrl(pageUrl) || isDouyinUrl(sourceUrl);
+  const douyinAspectRatio = isDouyin ? extractDouyinAspectRatio(html) : null;
   const isBilibili = !isDouyin && (isBilibiliUrl(pageUrl) || isBilibiliUrl(sourceUrl));
   const bilibiliMeta = isBilibili ? await fetchBilibiliMeta(inputUrl, html).catch((err) => {
     console.warn('Bilibili API fallback failed:', err.message);
@@ -482,6 +500,7 @@ async function extractFromUrl(inputUrl, options = {}) {
       : (isDouyin ? Array.from(new Set(['抖音', ...tags])) : tags),
     source_url: pageUrl,
     external_url: sourceUrl,
+    ...(douyinAspectRatio ? { video_aspect_ratio: douyinAspectRatio } : {}),
     // Keep imported articles fully inside this site. Structured data wins when a page provides it.
     ...(resolvedType === 'article' ? {
       title: structuredArticle.title || title || '未命名文章',
