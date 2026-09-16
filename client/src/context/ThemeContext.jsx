@@ -4,10 +4,38 @@ const C = createContext(null);
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    fetch('/api/theme').then((r) => r.json()).then(setTheme).catch(() => {});
+    let active = true;
+    fetch('/api/theme')
+      .then((r) => {
+        if (!r.ok) throw new Error('主题加载失败');
+        return r.json();
+      })
+      .then((data) => {
+        if (active) setTheme(data || {});
+      })
+      .catch(() => {
+        if (active) setTheme({});
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
+
+  if (!ready) {
+    return (
+      <div
+        aria-hidden="true"
+        className="min-h-screen"
+        style={{ background: 'radial-gradient(circle at 8% 18%, #25215d 0%, #1d1948 32%, #19163d 60%, #33204f 100%)' }}
+      />
+    );
+  }
 
   return <C.Provider value={theme}>{children}</C.Provider>;
 }
