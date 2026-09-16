@@ -30,6 +30,17 @@ function openCurrentTab(url) {
   if (url) window.location.href = url;
 }
 
+function externalVideoPlatform(work, url = '') {
+  const source = `${url} ${(work?.tags || []).join(' ')}`.toLowerCase();
+  if (/douyin\.com|iesdouyin\.com|抖音/.test(source)) {
+    return { name: '抖音', action: '打开抖音观看' };
+  }
+  if (/bilibili\.com|b23\.tv|B站/i.test(source)) {
+    return { name: 'B站', action: '打开B站播放' };
+  }
+  return { name: '原平台', action: '打开原网页播放' };
+}
+
 function TypeIcon({ type }) {
   const common = { className: 'h-3.5 w-3.5', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
   if (type === 'video') return <svg {...common}><path d="M5 7.5h11.5a2 2 0 0 1 2 2v6.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5a2 2 0 0 1 2-2Z" /><path d="m10 11.2 4 2.3-4 2.3v-4.6Z" /></svg>;
@@ -58,6 +69,7 @@ export default function WorkDetailModal({ work, onClose }) {
     && !isTencentVodUrl(work?.file_path || '');
   const originalUrl = work?.external_url || work?.source_url || work?.file_path;
   const isLinkOnlyVideo = work?.type === 'video' && !work?.file_path && !!originalUrl;
+  const linkPlatform = externalVideoPlatform(work, originalUrl);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -120,11 +132,11 @@ export default function WorkDetailModal({ work, onClose }) {
                   <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10-6.5-10-6.5Z" /></svg>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white">B站视频</p>
-                  <p className="mt-1 text-xs text-white/60">该视频需要跳转到 B站 原网页播放。</p>
+                  <p className="text-sm font-semibold text-white">{linkPlatform.name}视频</p>
+                  <p className="mt-1 text-xs text-white/60">该视频需要跳转到{linkPlatform.name}原网页播放。</p>
                 </div>
                 <button type="button" onClick={() => openCurrentTab(originalUrl)} className="rounded-full px-5 py-2 text-sm font-semibold text-white" style={{ background: acc }}>
-                  打开 B站播放
+                  {linkPlatform.action}
                 </button>
               </div>
             </div>

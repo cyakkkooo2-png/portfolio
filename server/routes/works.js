@@ -428,8 +428,8 @@ async function extractFromUrl(inputUrl, options = {}) {
   const html = fetchedPage.html;
   const sourceUrl = fetchedPage.finalUrl || pageUrl;
   const structuredArticle = findStructuredArticle(html);
-  const isBilibili = isBilibiliUrl(inputUrl) || isBilibiliUrl(pageUrl);
   const isDouyin = isDouyinUrl(pageUrl) || isDouyinUrl(sourceUrl);
+  const isBilibili = !isDouyin && (isBilibiliUrl(pageUrl) || isBilibiliUrl(sourceUrl));
   const bilibiliMeta = isBilibili ? await fetchBilibiliMeta(inputUrl, html).catch((err) => {
     console.warn('Bilibili API fallback failed:', err.message);
     return null;

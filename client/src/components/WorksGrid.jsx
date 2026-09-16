@@ -213,6 +213,11 @@ export default function WorksGrid({ onSelectWork }) {
 
   function handleWorkClick(work) {
     if (!canArrange) {
+      const originalUrl = work?.external_url || work?.source_url;
+      if (work?.type === 'video' && !work?.file_path && originalUrl) {
+        window.location.href = originalUrl;
+        return;
+      }
       onSelectWork?.(work);
       return;
     }
