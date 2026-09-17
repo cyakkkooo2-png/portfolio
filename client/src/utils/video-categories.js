@@ -1,2 +1,1 @@
-export const VIDEO_CATEGORIES = ['评测', '短视频', 'AE', 'AI'];
-
+export const VIDEO_CATEGORIES = ['AI', '短视频', 'AE', '评测'];
