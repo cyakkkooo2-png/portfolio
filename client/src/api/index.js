@@ -81,6 +81,13 @@ export function toggleWorkFeatured(id, featured) {
   });
 }
 
+export function updateWorkCategory(id, category) {
+  return request(`/works/${id}/category`, {
+    method: 'PATCH',
+    body: JSON.stringify({ category }),
+  });
+}
+
 export function getVodUploadSignature() {
   return request('/works/vod-upload-signature', {
     method: 'POST',

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { getWorks, deleteWork, reorderWorks, toggleWorkFeatured, toggleWorkVisibility } from '../../api';
+import { getWorks, deleteWork, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updateWorkCategory } from '../../api';
+import { VIDEO_CATEGORIES } from '../../utils/video-categories';
 
 function formatBytes(bytes) {
   if (!bytes) return '-';
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [batchBusy, setBatchBusy] = useState('');
   const [batchMessage, setBatchMessage] = useState(null);
   const [featuredBusyId, setFeaturedBusyId] = useState('');
+  const [categoryBusyId, setCategoryBusyId] = useState('');
   const location = useLocation();
 
   useEffect(() => {
@@ -118,6 +120,31 @@ export default function Dashboard() {
       setBatchMessage({ type: 'error', text: err.message || '修改精选状态失败' });
     } finally {
       setFeaturedBusyId('');
+    }
+  }
+
+  async function handleCategoryChange(work, category) {
+    if (categoryBusyId) return;
+    const previousCategory = work.category || '';
+    setCategoryBusyId(work.id);
+    setWorks((current) => current.map((item) => (
+      item.id === work.id ? { ...item, category } : item
+    )));
+    try {
+      const data = await updateWorkCategory(work.id, category);
+      if (data.work) {
+        setWorks((current) => current.map((item) => (
+          item.id === work.id ? { ...item, ...data.work } : item
+        )));
+      }
+      setBatchMessage({ type: 'success', text: category ? `已标记为“${category}”` : '已取消视频分类' });
+    } catch (err) {
+      setWorks((current) => current.map((item) => (
+        item.id === work.id ? { ...item, category: previousCategory } : item
+      )));
+      setBatchMessage({ type: 'error', text: err.message || '保存视频分类失败' });
+    } finally {
+      setCategoryBusyId('');
     }
   }
 
@@ -343,10 +370,24 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="col-span-2">
-                        <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                          {work.type === 'video' ? '视频' : work.type === 'image' ? '图片' : '文章'}
-                        </span>
-                        {work.type === 'video' && work.category && <span className="ml-2 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{work.category}</span>}
+                        {work.type === 'video' ? (
+                          <select
+                            value={work.category || ''}
+                            onChange={(event) => handleCategoryChange(work, event.target.value)}
+                            disabled={categoryBusyId === work.id}
+                            aria-label={`${work.title}的视频分类`}
+                            className="max-w-full rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 outline-none transition focus:border-blue-400 disabled:cursor-wait disabled:opacity-60"
+                          >
+                            <option value="">未分类</option>
+                            {VIDEO_CATEGORIES.map((category) => (
+                              <option key={category} value={category}>{category}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                            {work.type === 'image' ? '图片' : '文章'}
+                          </span>
+                        )}
                         {work.hidden && <span className="ml-2 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">已隐藏</span>}
                         {work.featured && <span className="ml-2 inline-block rounded-full bg-orange-50 px-2 py-0.5 text-xs text-orange-700">精选</span>}
                       </div>

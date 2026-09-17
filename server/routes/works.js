@@ -772,6 +772,19 @@ router.patch('/:id/featured', authMiddleware, (req, res) => {
   res.json({ work });
 });
 
+router.patch('/:id/category', authMiddleware, (req, res) => {
+  const existing = db.getWorkById(req.params.id);
+  if (!existing) return res.status(404).json({ error: '作品不存在' });
+  if (existing.type !== 'video') return res.status(400).json({ error: '只有视频可以设置视频分类' });
+
+  const allowedCategories = new Set(['', '评测', '短视频', 'AE', 'AI']);
+  const category = String(req.body?.category || '').trim();
+  if (!allowedCategories.has(category)) return res.status(400).json({ error: '无效的视频分类' });
+
+  const work = db.updateWork(req.params.id, { category });
+  res.json({ work });
+});
+
 router.delete('/cleanup-local-videos', authMiddleware, (req, res) => {
   try {
     const videosDir = path.join(UPLOADS_DIR, 'videos');
