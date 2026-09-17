@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getWorks, reorderWorks, toggleWorkFeatured, toggleWorkVisibility } from '../api';
+import { getWorks, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updateWorkCategory } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 import { VIDEO_CATEGORIES } from '../utils/video-categories';
@@ -146,6 +146,7 @@ export default function WorksGrid({ onSelectWork }) {
   const [selectedWorkIds, setSelectedWorkIds] = useState([]);
   const [batchSaving, setBatchSaving] = useState(false);
   const [featuredBusyId, setFeaturedBusyId] = useState('');
+  const [categoryBusyId, setCategoryBusyId] = useState('');
   const acc = t?.accentColor || '#ff6600';
   const isLoggedIn = Boolean(user);
   const canArrange = isLoggedIn && arrangeMode;
@@ -272,6 +273,31 @@ export default function WorksGrid({ onSelectWork }) {
       alert(err.message || '修改精选状态失败');
     } finally {
       setFeaturedBusyId('');
+    }
+  }
+
+  async function handleCategoryChange(event, work) {
+    event.stopPropagation();
+    if (categoryBusyId) return;
+    const category = event.target.value;
+    const previousWorks = works;
+    setCategoryBusyId(work.id);
+    setWorks((current) => current.map((item) => (
+      item.id === work.id ? { ...item, category } : item
+    )));
+
+    try {
+      const data = await updateWorkCategory(work.id, category);
+      if (data.work) {
+        setWorks((current) => current.map((item) => (
+          item.id === work.id ? { ...item, ...data.work } : item
+        )));
+      }
+    } catch (err) {
+      setWorks(previousWorks);
+      alert(err.message || '保存视频分类失败');
+    } finally {
+      setCategoryBusyId('');
     }
   }
 
@@ -493,6 +519,22 @@ export default function WorksGrid({ onSelectWork }) {
                       >
                         {selectedWorkSet.has(work.id) ? '✓' : '选'}
                       </button>
+                    )}
+                    {isLoggedIn && !canArrange && work.type === 'video' && (
+                      <select
+                        value={work.category || ''}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => handleCategoryChange(event, work)}
+                        disabled={categoryBusyId === work.id}
+                        aria-label={`${work.title}的视频分类`}
+                        className="absolute right-4 top-14 z-20 max-w-[7.5rem] rounded-full border-0 bg-white/95 px-3 py-1.5 text-xs font-bold text-gray-600 shadow-lg outline-none backdrop-blur transition hover:scale-105 disabled:cursor-wait disabled:opacity-60"
+                        title="直接设置视频分类"
+                      >
+                        <option value="">分类</option>
+                        {VIDEO_CATEGORIES.map((category) => (
+                          <option key={category} value={category}>{category}</option>
+                        ))}
+                      </select>
                     )}
                     {canArrange && (
                       <div
