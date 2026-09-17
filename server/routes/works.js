@@ -947,16 +947,13 @@ router.get('/:id/douyin-video', async (req, res) => {
       return res.status(400).send('Not a Douyin video');
     }
 
-    // The Douyin detail API rejects many datacenter IPs. When the stable media
-    // identifier was captured at import time, redirect the browser to Douyin's
-    // public play endpoint so playback comes from the visitor's own network.
+    // The Douyin detail API rejects many datacenter IPs. A stored media
+    // identifier lets us use the public play endpoint without resolving the
+    // detail page again. Keep proxying the bytes through this same-origin route:
+    // Douyin's CDN rejects some embedded cross-origin requests even though the
+    // exact same URL plays when opened in its own browser tab.
     const stableUrl = douyinStableVideoUrl(work.douyin_video_uri);
-    if (stableUrl) {
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      return res.redirect(302, stableUrl);
-    }
-
-    const media = await fetchDouyinMedia(work);
+    const media = stableUrl ? { url: stableUrl } : await fetchDouyinMedia(work);
     const upstream = await fetch(media.url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
