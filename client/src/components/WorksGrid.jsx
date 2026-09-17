@@ -574,9 +574,6 @@ export default function WorksGrid({ onSelectWork }) {
                           已隐藏：游客不可见
                         </span>
                       )}
-                      {work.type === 'video' && work.category && (
-                        <span>{work.category}</span>
-                      )}
                     </div>
                   </div>
                 </article>
