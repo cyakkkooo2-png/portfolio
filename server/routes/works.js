@@ -777,7 +777,7 @@ router.patch('/:id/category', authMiddleware, (req, res) => {
   if (!existing) return res.status(404).json({ error: '作品不存在' });
   if (existing.type !== 'video') return res.status(400).json({ error: '只有视频可以设置视频分类' });
 
-  const allowedCategories = new Set(['', '评测', '短视频', 'AE', 'AI']);
+  const allowedCategories = new Set(['', 'AI', '短视频', 'AE', '评测', '自主栏目']);
   const category = String(req.body?.category || '').trim();
   if (!allowedCategories.has(category)) return res.status(400).json({ error: '无效的视频分类' });
 
