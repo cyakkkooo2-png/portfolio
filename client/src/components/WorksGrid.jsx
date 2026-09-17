@@ -520,22 +520,6 @@ export default function WorksGrid({ onSelectWork }) {
                         {selectedWorkSet.has(work.id) ? '✓' : '选'}
                       </button>
                     )}
-                    {isLoggedIn && !canArrange && work.type === 'video' && (
-                      <select
-                        value={work.category || ''}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => handleCategoryChange(event, work)}
-                        disabled={categoryBusyId === work.id}
-                        aria-label={`${work.title}的视频分类`}
-                        className="absolute right-4 top-14 z-20 max-w-[7.5rem] rounded-full border-0 bg-white/95 px-3 py-1.5 text-xs font-bold text-gray-600 shadow-lg outline-none backdrop-blur transition hover:scale-105 disabled:cursor-wait disabled:opacity-60"
-                        title="直接设置视频分类"
-                      >
-                        <option value="">分类</option>
-                        {VIDEO_CATEGORIES.map((category) => (
-                          <option key={category} value={category}>{category}</option>
-                        ))}
-                      </select>
-                    )}
                     {canArrange && (
                       <div
                         className="absolute left-4 top-4 z-10 flex select-none items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-gray-700 shadow-lg backdrop-blur"
@@ -554,19 +538,36 @@ export default function WorksGrid({ onSelectWork }) {
                     <div className="absolute bottom-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-lg text-white opacity-0 transition-opacity group-hover:opacity-100" style={{ background: acc }}>→</div>
                   </div>
 
-                  <div className="mt-3 px-1">
+                  <div className="relative mt-3 px-1">
                     <h3
                       className="overflow-hidden text-base font-semibold leading-snug"
                       style={{
                         display: '-webkit-box',
                         WebkitBoxOrient: 'vertical',
                         WebkitLineClamp: 2,
+                        paddingRight: isLoggedIn && !canArrange && work.type === 'video' ? '7.75rem' : undefined,
                         fontFamily: WORK_CARD_TITLE_FONT,
                         color: '#061827',
                       }}
                     >
                       {work.title}
                     </h3>
+                    {isLoggedIn && !canArrange && work.type === 'video' && (
+                      <select
+                        value={work.category || ''}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => handleCategoryChange(event, work)}
+                        disabled={categoryBusyId === work.id}
+                        aria-label={`${work.title}的视频分类`}
+                        className="absolute bottom-0 right-1 z-20 w-28 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-gray-600 shadow-sm outline-none transition hover:border-orange-300 disabled:cursor-wait disabled:opacity-60"
+                        title="直接设置视频分类"
+                      >
+                        <option value="">分类</option>
+                        {VIDEO_CATEGORIES.map((category) => (
+                          <option key={category} value={category}>{category}</option>
+                        ))}
+                      </select>
+                    )}
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-400">
                       {work.hidden && (
                         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600">
