@@ -51,6 +51,11 @@ function douyinVideoId(url = '') {
     || '';
 }
 
+function savedVideoRatio(work = {}) {
+  const ratio = Number(work.video_aspect_ratio);
+  return Number.isFinite(ratio) && ratio > 0 ? ratio : 16 / 9;
+}
+
 function TypeIcon({ type }) {
   const common = { className: 'h-3.5 w-3.5', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
   if (type === 'video') return <svg {...common}><path d="M5 7.5h11.5a2 2 0 0 1 2 2v6.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5a2 2 0 0 1 2-2Z" /><path d="m10 11.2 4 2.3-4 2.3v-4.6Z" /></svg>;
@@ -71,7 +76,7 @@ function renderArticleBlock(block, index) {
 
 export default function WorkDetailModal({ work, onClose }) {
   const acc = '#ff6600';
-  const [videoRatio, setVideoRatio] = useState(16 / 9);
+  const [videoRatio, setVideoRatio] = useState(() => savedVideoRatio(work));
   const [videoError, setVideoError] = useState(false);
   const qualityControlTargetRef = useRef(null);
   const isExternalVideo = work?.type === 'video'
@@ -85,7 +90,12 @@ export default function WorkDetailModal({ work, onClose }) {
   const douyinPlayerSize = resolveDouyinPlayerSize(work);
   const displayRatio = videoRatio;
   const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
-  const portraitModalWidth = `min(94vw, ${douyinStageStyle.maxWidth}, calc(72dvh * ${displayRatio}))`;
+  const videoStageHeight = portraitVideo ? 72 : 62;
+  const videoModalMaxWidth = portraitVideo ? douyinStageStyle.maxWidth : '896px';
+  // Keep the modal stage at exactly the video's own ratio. Previously local
+  // portrait videos used a fixed 520px modal with a capped height, which made
+  // the stage wider than the video and produced artificial black side bars.
+  const fittedVideoModalWidth = `min(94vw, ${videoModalMaxWidth}, calc(${videoStageHeight}dvh * ${displayRatio}))`;
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -98,9 +108,9 @@ export default function WorkDetailModal({ work, onClose }) {
   }, [onClose]);
 
   useEffect(() => {
-    setVideoRatio(isDouyinEmbed ? douyinPlayerSize.ratio : 16 / 9);
+    setVideoRatio(isDouyinEmbed ? douyinPlayerSize.ratio : savedVideoRatio(work));
     setVideoError(false);
-  }, [work?.id, isDouyinEmbed, douyinPlayerSize.ratio]);
+  }, [work?.id, work?.video_aspect_ratio, isDouyinEmbed, douyinPlayerSize.ratio]);
 
   if (!work) return null;
 
@@ -113,7 +123,7 @@ export default function WorkDetailModal({ work, onClose }) {
       <div
         className="relative flex h-[92dvh] w-full flex-col overflow-hidden rounded-2xl transition-[max-width] duration-300"
         style={{
-          maxWidth: isDouyinEmbed ? portraitModalWidth : (portraitVideo ? 'min(94vw, 520px)' : '896px'),
+          maxWidth: work.type === 'video' ? fittedVideoModalWidth : '896px',
           background: '#111118',
           border: '1px solid rgba(255,255,255,0.08)',
           boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
@@ -134,7 +144,7 @@ export default function WorkDetailModal({ work, onClose }) {
           style={{
             background: '#080810',
             aspectRatio: work.type === 'video' ? displayRatio : '16 / 9',
-            maxHeight: work.type === 'article' ? '34vh' : (portraitVideo ? '72dvh' : '62dvh'),
+            maxHeight: work.type === 'article' ? '34vh' : `${videoStageHeight}dvh`,
           }}
         >
           {work.type === 'video' && isDouyinEmbed ? (

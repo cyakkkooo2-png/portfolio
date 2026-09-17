@@ -16,6 +16,34 @@ function fileNameWithoutExtension(value = '') {
   return String(value).replace(/\.[^/.]+$/, '');
 }
 
+function readVideoAspectRatio(videoFile) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(videoFile);
+    const cleanup = () => {
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(objectUrl);
+    };
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      cleanup();
+      if (!width || !height) {
+        reject(new Error('无法读取视频画面比例'));
+        return;
+      }
+      resolve(Number((width / height).toFixed(6)));
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('浏览器无法读取视频画面比例'));
+    };
+    video.src = objectUrl;
+  });
+}
+
 // Create a lightweight JPEG cover in the browser. This keeps the server from
 // having to decode video files (which is expensive on Railway's small plans).
 function captureVideoCover(videoFile) {
@@ -268,6 +296,7 @@ export default function UploadWork() {
     try {
       for (let index = 0; index < batchFiles.length; index += 1) {
         const videoFile = batchFiles[index];
+        const videoAspectRatio = await readVideoAspectRatio(videoFile);
         const titleFromFile = videoFile.name.replace(/\.[^/.]+$/, '') || videoFile.name;
         const fileName = `(${index + 1}/${batchFiles.length}) ${videoFile.name}`;
 
@@ -286,6 +315,7 @@ export default function UploadWork() {
             content,
             tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
             category: category.trim(),
+            videoAspectRatio,
           },
           onProgress: (uploadProgress) => {
             const percent = Math.round(((index + (uploadProgress.percent / 100)) / batchFiles.length) * 100);
@@ -335,6 +365,7 @@ export default function UploadWork() {
       if (coverToUpload) formData.append('cover', coverToUpload);
 
       if (type === 'video') {
+        const videoAspectRatio = await readVideoAspectRatio(file);
         await uploadVideoDirectToVod({
           videoFile: file,
           coverFile: coverToUpload,
@@ -344,6 +375,7 @@ export default function UploadWork() {
             content,
             tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
             category: category.trim(),
+            videoAspectRatio,
           },
           onProgress: (p) => {
             setProgress({ percent: p.percent, speed: '直传腾讯云点播', fileName });

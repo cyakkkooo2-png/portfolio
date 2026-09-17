@@ -1009,7 +1009,7 @@ router.post('/vod-complete', authMiddleware, async (req, res) => {
   try {
     const {
       title, description, content, tags, category,
-      fileUrl, coverUrl, fileId, fileSize, originalName,
+      fileUrl, coverUrl, fileId, fileSize, originalName, videoAspectRatio,
     } = req.body || {};
     const resolvedTitle = String(title || '').trim() || fileNameWithoutExtension(originalName);
     if (!resolvedTitle || !fileUrl || !fileId) {
@@ -1035,6 +1035,7 @@ router.post('/vod-complete', authMiddleware, async (req, res) => {
       tags: parsedTags,
       category: String(category || '').trim().slice(0, 40),
       file_size: Number(fileSize) || null,
+      video_aspect_ratio: Number(videoAspectRatio) || null,
     });
     try {
       await vodStorage.requestSingleTranscode(fileId);
