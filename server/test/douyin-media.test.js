@@ -12,12 +12,13 @@ test('extracts a Douyin video id from canonical and player URLs', () => {
 });
 
 test('extracts the real play URL and 3:4 ratio from snake-case metadata', () => {
-  const html = `<script>{"aweme_detail":{"video":{"width":1080,"height":1440,"play_addr":{"url_list":["https:\\/\\/video.example.com\\/play.mp4?x=1\\u0026y=2"]}}}}</script>`;
+  const html = `<script>{"aweme_detail":{"video":{"width":1080,"height":1440,"play_addr":{"uri":"stable-video-id","url_list":["https:\\/\\/video.example.com\\/play.mp4?x=1\\u0026y=2"]}}}}</script>`;
   assert.deepEqual(extractDouyinMedia(html), {
     url: 'https://video.example.com/play.mp4?x=1&y=2',
     width: 1080,
     height: 1440,
     ratio: 0.75,
+    uri: 'stable-video-id',
   });
 });
 

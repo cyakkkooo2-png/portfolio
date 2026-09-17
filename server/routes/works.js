@@ -364,6 +364,12 @@ function extractDouyinAspectRatio(html = '') {
 const douyinMediaCache = new Map();
 const DOUYIN_DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36';
 
+function douyinStableVideoUrl(uri = '') {
+  const value = String(uri).trim();
+  if (!/^[A-Za-z0-9_-]{10,200}$/.test(value)) return '';
+  return `https://aweme.snssdk.com/aweme/v1/play/?video_id=${encodeURIComponent(value)}&ratio=1080p&line=0`;
+}
+
 async function fetchDouyinApiMedia(id) {
   const ttwidResponse = await fetch('https://ttwid.bytedance.com/ttwid/union/register/', {
     method: 'POST',
@@ -939,6 +945,15 @@ router.get('/:id/douyin-video', async (req, res) => {
     if (!work || work.type !== 'video') return res.status(404).send('Video not found');
     if (!isDouyinUrl(work.external_url) && !isDouyinUrl(work.source_url)) {
       return res.status(400).send('Not a Douyin video');
+    }
+
+    // The Douyin detail API rejects many datacenter IPs. When the stable media
+    // identifier was captured at import time, redirect the browser to Douyin's
+    // public play endpoint so playback comes from the visitor's own network.
+    const stableUrl = douyinStableVideoUrl(work.douyin_video_uri);
+    if (stableUrl) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.redirect(302, stableUrl);
     }
 
     const media = await fetchDouyinMedia(work);

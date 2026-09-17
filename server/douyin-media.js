@@ -58,7 +58,8 @@ function mediaFromObject(root) {
       const width = Number(value.width || value.video_width || value.videoWidth) || 0;
       const height = Number(value.height || value.video_height || value.videoHeight) || 0;
       const ratio = width && height ? Number((width / height).toFixed(4)) : null;
-      return { url, width, height, ratio };
+      const uri = String(playValue?.uri || playValue?.video_id || '').trim();
+      return { url, width, height, ratio, ...(uri ? { uri } : {}) };
     }
 
     if (Array.isArray(value)) queue.push(...value);
