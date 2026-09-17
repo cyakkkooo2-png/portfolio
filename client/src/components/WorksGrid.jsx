@@ -559,7 +559,7 @@ export default function WorksGrid({ onSelectWork }) {
                         onChange={(event) => handleCategoryChange(event, work)}
                         disabled={categoryBusyId === work.id}
                         aria-label={`${work.title}的视频分类`}
-                        className="absolute bottom-0 right-1 z-20 w-28 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-gray-600 shadow-sm outline-none transition hover:border-orange-300 disabled:cursor-wait disabled:opacity-60"
+                        className="absolute bottom-[7px] right-1 z-20 w-28 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-gray-600 shadow-sm outline-none transition hover:border-orange-300 disabled:cursor-wait disabled:opacity-60"
                         title="直接设置视频分类"
                       >
                         <option value="">分类</option>
