@@ -5,6 +5,7 @@ import ProgressBar from '../../components/ProgressBar';
 import StorageBar from '../../components/StorageBar';
 import { useAuth } from '../../context/AuthContext';
 import VideoCategoryPicker from '../../components/VideoCategoryPicker';
+import { batchTitleForFile, shouldBatchUpload } from '../../utils/batch-upload';
 
 const TYPES = [
   { key: 'video', label: '视频', icon: '🎬' },
@@ -291,43 +292,65 @@ export default function UploadWork() {
   async function handleBatchUpload() {
     setUploading(true);
     setError('');
-    setProgress({ percent: 0, speed: 'Preparing batch upload...', fileName: `0/${batchFiles.length}` });
+    setProgress({ percent: 0, speed: '正在准备批量上传…', fileName: `0/${batchFiles.length}` });
 
     try {
       for (let index = 0; index < batchFiles.length; index += 1) {
-        const videoFile = batchFiles[index];
-        const videoAspectRatio = await readVideoAspectRatio(videoFile);
-        const titleFromFile = videoFile.name.replace(/\.[^/.]+$/, '') || videoFile.name;
-        const fileName = `(${index + 1}/${batchFiles.length}) ${videoFile.name}`;
+        const currentFile = batchFiles[index];
+        const titleFromFile = batchTitleForFile(currentFile);
+        const fileName = `(${index + 1}/${batchFiles.length}) ${currentFile.name}`;
 
-        let coverToUpload = cover;
-        if (!coverToUpload) {
-          setProgress({ percent: Math.round((index / batchFiles.length) * 100), speed: 'Generating video cover...', fileName });
-          coverToUpload = await captureVideoCover(videoFile);
+        try {
+          if (type === 'video') {
+            const videoAspectRatio = await readVideoAspectRatio(currentFile);
+            let coverToUpload = cover;
+            if (!coverToUpload) {
+              setProgress({ percent: Math.round((index / batchFiles.length) * 100), speed: '正在生成视频封面…', fileName });
+              coverToUpload = await captureVideoCover(currentFile);
+            }
+
+            await uploadVideoDirectToVod({
+              videoFile: currentFile,
+              coverFile: coverToUpload,
+              metadata: {
+                title: titleFromFile,
+                description,
+                content,
+                tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+                category: category.trim(),
+                videoAspectRatio,
+              },
+              onProgress: (uploadProgress) => {
+                const percent = Math.round(((index + (uploadProgress.percent / 100)) / batchFiles.length) * 100);
+                setProgress({ percent, speed: '直传腾讯云点播', fileName });
+              },
+            });
+          } else {
+            const formData = new FormData();
+            formData.append('title', titleFromFile);
+            formData.append('description', description);
+            formData.append('type', 'image');
+            formData.append('content', content);
+            formData.append('tags', JSON.stringify(tags.split(',').map((tag) => tag.trim()).filter(Boolean)));
+            formData.append('category', '');
+            formData.append('image', currentFile);
+            await uploadWorkWithProgress(formData, {
+              method: 'POST',
+              onProgress: (uploadProgress) => {
+                const percent = Math.round(((index + (uploadProgress.percent / 100)) / batchFiles.length) * 100);
+                setProgress({ percent, speed: uploadProgress.speed || '正在上传图片', fileName });
+              },
+            });
+          }
+        } catch (uploadError) {
+          throw new Error(`${currentFile.name} 上传失败（已成功 ${index} 个）：${uploadError.message || '请稍后重试'}`);
         }
-
-        await uploadVideoDirectToVod({
-          videoFile,
-          coverFile: coverToUpload,
-          metadata: {
-            title: titleFromFile,
-            description,
-            content,
-            tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
-            category: category.trim(),
-            videoAspectRatio,
-          },
-          onProgress: (uploadProgress) => {
-            const percent = Math.round(((index + (uploadProgress.percent / 100)) / batchFiles.length) * 100);
-            setProgress({ percent, speed: '直传腾讯云点播', fileName });
-          },
-        });
       }
 
-      setProgress({ percent: 100, speed: `Uploaded ${batchFiles.length} videos`, fileName: 'Batch complete' });
+      setProgress({ percent: 100, speed: `已上传 ${batchFiles.length} 个作品`, fileName: '批量上传完成' });
       setTimeout(() => navigate('/admin'), 900);
     } catch (err) {
-      setError(err.message || 'Batch upload failed');
+      setError(err.message || '批量上传失败');
     } finally {
       setUploading(false);
     }
@@ -335,7 +358,7 @@ export default function UploadWork() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (type === 'video' && batchFiles.length > 1) {
+    if (shouldBatchUpload(type, batchFiles)) {
       await handleBatchUpload();
       return;
     }
@@ -467,8 +490,8 @@ export default function UploadWork() {
           <div className="space-y-5">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">标题（选填）</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder={type === 'video' && batchFiles.length > 1 ? '批量上传时，自动使用每个视频的文件名' : '不填则自动使用文件名'} disabled={type === 'video' && batchFiles.length > 1} />
-              {type === 'video' && batchFiles.length > 1 && <p className="mt-1 text-xs text-gray-500">批量上传会使用每个文件名作为标题，之后可以在后台逐个修改。</p>}
+              <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} placeholder={shouldBatchUpload(type, batchFiles) ? '批量上传时，自动使用每个文件名' : '不填则自动使用文件名'} disabled={shouldBatchUpload(type, batchFiles)} />
+              {shouldBatchUpload(type, batchFiles) && <p className="mt-1 text-xs text-gray-500">批量上传会使用每个文件名作为标题，之后可以在后台逐个修改。</p>}
             </div>
 
             <div>
@@ -480,22 +503,23 @@ export default function UploadWork() {
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">{type === 'video' ? '视频文件 *' : type === 'image' ? '图片文件 *' : '文章文档 *'}</label>
                 <p className="mb-2 text-xs text-gray-500">{type === 'article' ? '支持 PDF、Word、TXT 或 Markdown 文档；正文会作为文档保存在作品中。' : ''}</p>
-                <input type="file" multiple={type === 'video'} accept={type === 'video' ? 'video/*' : type === 'image' ? 'image/*' : '.pdf,.doc,.docx,.txt,.md'} onChange={(e) => {
+                <input type="file" multiple={type === 'video' || type === 'image'} accept={type === 'video' ? 'video/*' : type === 'image' ? 'image/*' : '.pdf,.doc,.docx,.txt,.md'} onChange={(e) => {
                   const selected = Array.from(e.target.files || []);
                   setFile(selected[0] || null);
-                  setBatchFiles(type === 'video' ? selected : []);
-                  if (selected.length === 1 && !title.trim()) setTitle(fileNameWithoutExtension(selected[0].name));
+                  setBatchFiles(type === 'video' || type === 'image' ? selected : []);
+                  if (selected.length > 1) setTitle('');
+                  else if (selected.length === 1 && !title.trim()) setTitle(fileNameWithoutExtension(selected[0].name));
                 }} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
-                {type === 'video' && <p className="mt-1 text-xs text-gray-500">可按住 Ctrl 或 Shift 一次选择多个视频；系统会按顺序上传。</p>}
-                {batchFiles.length > 1 ? <p className="mt-1 text-xs font-medium text-blue-600">已选择 {batchFiles.length} 个视频，将自动以文件名作为标题。</p> : file && <p className="mt-1 text-xs text-gray-500">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
+                {(type === 'video' || type === 'image') && <p className="mt-1 text-xs text-gray-500">可按住 Ctrl 或 Shift 一次选择多个{type === 'video' ? '视频' : '图片'}；系统会按顺序上传。</p>}
+                {batchFiles.length > 1 ? <p className="mt-1 text-xs font-medium text-blue-600">已选择 {batchFiles.length} 个{type === 'video' ? '视频' : '图片'}，将自动以文件名作为标题。</p> : file && <p className="mt-1 text-xs text-gray-500">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
               </div>
             )}
 
-            <div>
+            {!(type === 'image' && batchFiles.length > 1) && <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">封面图（可选）</label>
               {type === 'video' && <p className="mb-2 text-xs text-gray-500">未上传封面时，会自动截取视频约第 1 秒的画面作为封面。</p>}
               <input type="file" accept="image/*" onChange={(e) => setCover(e.target.files?.[0] || null)} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
-            </div>
+            </div>}
 
 
             <div>
