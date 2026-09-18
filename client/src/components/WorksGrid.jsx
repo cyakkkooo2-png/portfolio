@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getWorks, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updateWorkCategory } from '../api';
+import { getWorks, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updateWorkCategory, uploadWorkWithProgress } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 import { VIDEO_CATEGORIES } from '../utils/video-categories';
@@ -146,6 +146,7 @@ export default function WorksGrid({ onSelectWork }) {
   const [batchSaving, setBatchSaving] = useState(false);
   const [featuredBusyId, setFeaturedBusyId] = useState('');
   const [categoryBusyId, setCategoryBusyId] = useState('');
+  const [coverBusyId, setCoverBusyId] = useState('');
   const [measuredImageRatios, setMeasuredImageRatios] = useState({});
   const acc = t?.accentColor || '#ff6600';
   const isLoggedIn = Boolean(user);
@@ -333,6 +334,33 @@ export default function WorksGrid({ onSelectWork }) {
       alert(err.message || '保存视频分类失败');
     } finally {
       setCategoryBusyId('');
+    }
+  }
+
+  async function handleReplaceCover(event, work) {
+    event.stopPropagation();
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || coverBusyId) return;
+
+    setCoverBusyId(work.id);
+    try {
+      const formData = new FormData();
+      formData.append('cover', file);
+      const data = await uploadWorkWithProgress(formData, {
+        method: 'PUT',
+        workId: work.id,
+      });
+      if (data.work) {
+        setWorks((current) => current.map((item) => (
+          item.id === work.id ? { ...item, ...data.work } : item
+        )));
+      }
+    } catch (err) {
+      alert(err.message || '替换封面失败');
+    } finally {
+      setCoverBusyId('');
     }
   }
 
@@ -595,6 +623,24 @@ export default function WorksGrid({ onSelectWork }) {
                         </span>
                         {selectedMoveId === work.id ? '已选中' : '点击移动'}
                       </div>
+                    )}
+                    {isLoggedIn && !canArrange && work.type === 'video' && (
+                      <label
+                        className={`absolute bottom-4 left-4 z-20 inline-flex cursor-pointer items-center rounded-full px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105 ${coverBusyId && coverBusyId !== work.id ? 'pointer-events-none opacity-50' : ''}`}
+                        style={{ background: 'rgba(255,255,255,0.95)', color: '#4b5563' }}
+                        title="选择一张图片作为新封面"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {coverBusyId === work.id ? '上传中…' : '替换封面'}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          disabled={Boolean(coverBusyId)}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => handleReplaceCover(event, work)}
+                        />
+                      </label>
                     )}
                     <div className="absolute bottom-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-lg text-white opacity-0 transition-opacity group-hover:opacity-100" style={{ background: acc }}>→</div>
                   </div>
