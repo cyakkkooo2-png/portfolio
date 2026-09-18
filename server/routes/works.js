@@ -9,7 +9,7 @@ const { authMiddleware, optionalAuthMiddleware } = require('../middleware/auth')
 const githubStorage = require('../github-storage');
 const cosStorage = require('../cos-storage');
 const vodStorage = require('../vod-storage');
-const { extractDouyinVideoId, extractDouyinMedia } = require('../douyin-media');
+const { extractDouyinVideoId, extractDouyinMedia, buildDouyinRequestHeaders } = require('../douyin-media');
 const { generateABogus } = require('../douyin-sign');
 const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
 
@@ -973,12 +973,10 @@ router.get('/:id/douyin-video', async (req, res) => {
     const stableUrl = douyinStableVideoUrl(work.douyin_video_uri);
     const media = stableUrl ? { url: stableUrl } : await fetchDouyinMedia(work);
     const upstream = await fetch(media.url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
-        Accept: req.get('accept') || 'video/mp4,video/*;q=0.9,*/*;q=0.8',
-        Range: req.get('range') || '',
-        Referer: 'https://www.douyin.com/',
-      },
+      headers: buildDouyinRequestHeaders({
+        accept: req.get('accept'),
+        range: req.get('range'),
+      }),
       redirect: 'follow',
     });
     if (!upstream.ok && upstream.status !== 206) {

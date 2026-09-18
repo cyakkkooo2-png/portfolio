@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   extractDouyinVideoId,
   extractDouyinMedia,
+  buildDouyinRequestHeaders,
 } = require('../douyin-media');
 
 test('extracts a Douyin video id from canonical and player URLs', () => {
@@ -54,4 +55,15 @@ test('extracts landscape media from percent-encoded Douyin page state', () => {
     ratio: 1.7778,
     uri: 'v0300fg10000ck7clvrc77u5pj7nnkig',
   });
+});
+
+test('omits an empty Range header so normal browser playback is accepted', () => {
+  const headers = buildDouyinRequestHeaders({ accept: 'video/*', range: '' });
+  assert.equal(headers.Accept, 'video/*');
+  assert.equal(Object.hasOwn(headers, 'Range'), false);
+});
+
+test('forwards a real Range header for seeking and partial playback', () => {
+  const headers = buildDouyinRequestHeaders({ range: 'bytes=0-1023' });
+  assert.equal(headers.Range, 'bytes=0-1023');
 });
