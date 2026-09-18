@@ -13,10 +13,14 @@ test('keeps only a width cap instead of forcing every Douyin video to 3:4', () =
   });
 });
 
-test('uses stored video dimensions and falls back to the usual vertical ratio', () => {
+test('uses the saved 1920x1080 dimensions for a landscape Douyin video', () => {
+  assert.equal(resolveDouyinAspectRatio({ video_width: 1920, video_height: 1080 }), 16 / 9);
+});
+
+test('does not force a Douyin video into portrait mode when its ratio is not saved', () => {
   assert.equal(resolveDouyinAspectRatio({ video_width: 1080, video_height: 1920 }), 9 / 16);
   assert.equal(resolveDouyinAspectRatio({ video_aspect_ratio: '3:4' }), 3 / 4);
-  assert.equal(resolveDouyinAspectRatio({}), 9 / 16);
+  assert.equal(resolveDouyinAspectRatio({}), 16 / 9);
 });
 
 test('sizes the stage to the complete source video canvas', () => {

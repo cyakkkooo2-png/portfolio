@@ -16,7 +16,7 @@ export function resolveDouyinAspectRatio(work = {}) {
   }
 
   const numericRatio = Number(rawRatio);
-  return Number.isFinite(numericRatio) && numericRatio > 0 ? numericRatio : 9 / 16;
+  return Number.isFinite(numericRatio) && numericRatio > 0 ? numericRatio : 16 / 9;
 }
 
 export function resolveDouyinPlayerSize(work = {}) {
