@@ -560,7 +560,7 @@ async function extractFromUrl(inputUrl, options = {}) {
     /<p[^>]+class=["'][^"']*\bdesc\b[^"']*["'][^>]*>[\s\S]*?<span[^>]*>[^<]*<\/span>([\s\S]*?)<\/p>/i,
     /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,
   ]);
-  const thumbnail = bilibiliMeta?.thumbnail || normalizeMediaUrl((isDouyin ? pickMetaContent(html, ['og:image', 'twitter:image']) : '') || pick(html, [
+  const thumbnail = bilibiliMeta?.thumbnail || normalizeMediaUrl((isDouyin ? pickMetaContent(html, ['lark:url:video_cover_image_url', 'og:image', 'twitter:image']) : '') || pick(html, [
     /<video[^>]+poster=["']([^"']+)["']/i,
     /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
     /<meta[^>]+itemprop=["']image["'][^>]+content=["']([^"']+)["']/i,
