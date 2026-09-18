@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 import { VIDEO_CATEGORIES } from '../utils/video-categories';
 import { imageAspectRatio, splitImageWorksByOrientation } from '../utils/image-layout';
+import { externalVideoPreviewSrc } from '../utils/external-video-preview';
 
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
@@ -15,9 +16,6 @@ const FILTERS = [
   { k: 'image', l: '图片', icon: 'image' },
   { k: 'article', l: '文章', icon: 'article' },
 ];
-
-const LABELS = { video: '视频', image: '图片', article: '文章' };
-const ICONS = { video: 'video', image: 'image', article: 'article' };
 
 function isTencentVodUrl(url = '') {
   return /^https?:\/\/[^/]+\.(?:vod2\.myqcloud\.com|vod-qcloud\.com|vod\.tencent-cloud\.com)(?:\/|$)/i.test(url);
@@ -532,7 +530,26 @@ export default function WorksGrid({ onSelectWork }) {
                       boxShadow: work.hidden ? '0 18px 36px rgba(15,19,34,0.08)' : '0 24px 48px rgba(15,19,34,0.12)',
                     }}
                   >
-                    {work.type === 'image' && work.file_path ? <img src={assetUrl(work.file_path)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" /> : work.thumbnail ? <img src={assetUrl(work.thumbnail)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" /> : null}
+                    {work.type === 'image' && work.file_path ? (
+                      <img src={assetUrl(work.file_path)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" />
+                    ) : work.thumbnail ? (
+                      <img src={assetUrl(work.thumbnail)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" />
+                    ) : externalVideoPreviewSrc(work) ? (
+                      <video
+                        src={externalVideoPreviewSrc(work)}
+                        className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        aria-label={`${work.title} 视频封面`}
+                        onLoadedMetadata={(event) => {
+                          const video = event.currentTarget;
+                          if (Number.isFinite(video.duration) && video.duration > 0) {
+                            video.currentTime = Math.min(0.15, video.duration / 10);
+                          }
+                        }}
+                      />
+                    ) : null}
                     <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0) 0%, rgba(6,8,18,0.04) 48%, rgba(6,8,18,0.24) 100%)' }} />
                     {isLoggedIn && !canArrange && (
                       <button
@@ -579,10 +596,6 @@ export default function WorksGrid({ onSelectWork }) {
                         {selectedMoveId === work.id ? '已选中' : '点击移动'}
                       </div>
                     )}
-                    <span className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur" style={{ background: 'rgba(0,0,0,0.34)' }}>
-                      <FilterIcon type={ICONS[work.type] || 'article'} active color="#fff" />
-                      {work.type === 'video' && work.category ? work.category : (LABELS[work.type] || work.type)}
-                    </span>
                     <div className="absolute bottom-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-lg text-white opacity-0 transition-opacity group-hover:opacity-100" style={{ background: acc }}>→</div>
                   </div>
 
