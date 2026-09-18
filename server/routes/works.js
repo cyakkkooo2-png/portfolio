@@ -13,6 +13,7 @@ const { extractDouyinVideoId, extractDouyinMedia, buildDouyinRequestHeaders } = 
 const { generateABogus } = require('../douyin-sign');
 const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
 const { isPconlineVideoUrl, normalizePconlineVideoUrl } = require('../pconline-video');
+const { bilibiliFallbackTitle, extractBilibiliIds, isBilibiliUrl, shouldFetchBilibiliPage } = require('../bilibili-url');
 
 const router = express.Router();
 
@@ -309,10 +310,6 @@ function pickRaw(html, patterns) {
   return '';
 }
 
-function isBilibiliUrl(url = '') {
-  return /(^|\.)bilibili\.com|b23\.tv/i.test(url);
-}
-
 function extractSharedUrl(value = '') {
   const match = String(value || '').match(/https?:\/\/[^\s<>"']+/i);
   return (match?.[0] || String(value || '').trim()).replace(/[，。！？、；：）】》]+$/u, '');
@@ -471,13 +468,6 @@ function normalizeMediaUrl(url = '', baseUrl = '') {
   return value;
 }
 
-function extractBilibiliIds(inputUrl = '', html = '') {
-  const source = `${inputUrl}\n${html}`;
-  const bvid = source.match(/BV[0-9A-Za-z]{10}/i)?.[0];
-  const aid = source.match(/(?:\/video\/av|[?&]aid=|["']aid["']\s*:\s*)(\d+)/i)?.[1];
-  return { bvid, aid };
-}
-
 async function fetchHtml(url) {
   const response = await fetch(url, {
     headers: {
@@ -535,7 +525,9 @@ async function extractFromUrl(inputUrl, options = {}) {
   const isPconlineVideo = isPconlineVideoUrl(pageUrl);
   if (isPconlineVideo) pageUrl = normalizePconlineVideoUrl(pageUrl);
 
-  const fetchedPage = await fetchHtml(pageUrl);
+  const fetchedPage = shouldFetchBilibiliPage(pageUrl)
+    ? await fetchHtml(pageUrl)
+    : { html: '', finalUrl: pageUrl };
   const html = fetchedPage.html;
   const sourceUrl = fetchedPage.finalUrl || pageUrl;
   const structuredArticle = findStructuredArticle(html);
@@ -584,7 +576,8 @@ async function extractFromUrl(inputUrl, options = {}) {
     : '';
 
   return {
-    title: bilibiliMeta?.title || douyinDescription || title || '抖音视频',
+    title: bilibiliMeta?.title || douyinDescription || title
+      || (isBilibili ? bilibiliFallbackTitle(inputUrl, html) : '抖音视频'),
     description: bilibiliMeta?.description || description,
     type: resolvedType,
     file_path: resolvedVideoUrl,
