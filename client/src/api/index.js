@@ -4,6 +4,13 @@ function getToken() {
   return localStorage.getItem('token');
 }
 
+function apiError(data = {}, status = 0, fallback = '请求失败') {
+  const error = new Error(data.error || fallback);
+  error.status = status;
+  error.code = data.code || '';
+  return error;
+}
+
 async function request(url, options = {}) {
   const token = getToken();
   const headers = { ...options.headers };
@@ -24,7 +31,7 @@ async function request(url, options = {}) {
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.error || '请求失败');
+    throw apiError(data, res.status);
   }
 
   return data;
@@ -199,7 +206,7 @@ export function uploadWorkWithProgress(formData, { onProgress, method = 'POST', 
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve(data);
       } else {
-        reject(new Error(data.error || `上传失败 (${xhr.status})`));
+        reject(apiError(data, xhr.status, `上传失败 (${xhr.status})`));
       }
     });
 

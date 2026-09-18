@@ -31,3 +31,27 @@ test('extracts camel-case metadata embedded in a page state script', () => {
     ratio: 0.5625,
   });
 });
+
+test('extracts landscape media from percent-encoded Douyin page state', () => {
+  const state = encodeURIComponent(JSON.stringify({
+    aweme: {
+      aweme_id: '7281981187520777524',
+      video: {
+        width: 1280,
+        height: 720,
+        play_addr: {
+          uri: 'v0300fg10000ck7clvrc77u5pj7nnkig',
+          url_list: ['https://video.example.com/landscape.mp4'],
+        },
+      },
+    },
+  }));
+
+  assert.deepEqual(extractDouyinMedia(`<script>${state}</script>`), {
+    url: 'https://video.example.com/landscape.mp4',
+    width: 1280,
+    height: 720,
+    ratio: 1.7778,
+    uri: 'v0300fg10000ck7clvrc77u5pj7nnkig',
+  });
+});

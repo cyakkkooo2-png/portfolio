@@ -539,7 +539,8 @@ async function extractFromUrl(inputUrl, options = {}) {
   const sourceUrl = fetchedPage.finalUrl || pageUrl;
   const structuredArticle = findStructuredArticle(html);
   const isDouyin = isDouyinUrl(pageUrl) || isDouyinUrl(sourceUrl);
-  const douyinAspectRatio = isDouyin ? extractDouyinAspectRatio(html) : null;
+  const douyinMedia = isDouyin ? extractDouyinMedia(html) : null;
+  const douyinAspectRatio = douyinMedia?.ratio || (isDouyin ? extractDouyinAspectRatio(html) : null);
   const isBilibili = !isDouyin && (isBilibiliUrl(pageUrl) || isBilibiliUrl(sourceUrl));
   const bilibiliMeta = isBilibili ? await fetchBilibiliMeta(inputUrl, html).catch((err) => {
     console.warn('Bilibili API fallback failed:', err.message);
@@ -593,6 +594,7 @@ async function extractFromUrl(inputUrl, options = {}) {
       : (isDouyin ? Array.from(new Set(['抖音', ...tags])) : tags),
     source_url: pageUrl,
     external_url: sourceUrl,
+    ...(douyinMedia?.uri ? { douyin_video_uri: douyinMedia.uri } : {}),
     ...(douyinAspectRatio ? { video_aspect_ratio: douyinAspectRatio } : {}),
     // Keep imported articles fully inside this site. Structured data wins when a page provides it.
     ...(resolvedType === 'article' ? {
@@ -712,7 +714,10 @@ function findDuplicateWork({ title = '', type = '', sourceUrl = '', filePath = '
 
 function rejectDuplicate(res, duplicate) {
   if (!duplicate) return false;
-  res.status(409).json({ error: `作品已存在：${duplicate.title || '同名作品'}` });
+  res.status(409).json({
+    code: 'DUPLICATE_WORK',
+    error: `作品已存在：${duplicate.title || '同名作品'}`,
+  });
   return true;
 }
 
@@ -1082,7 +1087,7 @@ router.post('/', authMiddleware, upload.fields([
   { name: 'image', maxCount: 1 }, { name: 'video', maxCount: 1 }, { name: 'document', maxCount: 1 }, { name: 'cover', maxCount: 1 },
 ]), async (req, res) => {
   try {
-    const { title, description, type, content, tags, category } = req.body;
+    const { title, description, type, content, tags, category, imageAspectRatio } = req.body;
     if (!type) return res.status(400).json({ error: '类型为必填项' });
     if (!['video', 'image', 'article'].includes(type)) return res.status(400).json({ error: '无效的类型' });
 
@@ -1131,6 +1136,7 @@ router.post('/', authMiddleware, upload.fields([
       tags: typeof tags === 'string' ? JSON.parse(tags) : (tags || []),
       category: type === 'video' ? String(category || '').trim().slice(0, 40) : '',
       file_size: totalFileSize || null,
+      image_aspect_ratio: type === 'image' ? Number(imageAspectRatio) || null : null,
     });
 
     res.status(201).json({ work });

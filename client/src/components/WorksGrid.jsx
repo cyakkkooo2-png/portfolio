@@ -3,6 +3,7 @@ import { getWorks, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updat
 import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 import { VIDEO_CATEGORIES } from '../utils/video-categories';
+import { imageAspectRatio, splitImageWorksByOrientation } from '../utils/image-layout';
 
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
@@ -147,6 +148,7 @@ export default function WorksGrid({ onSelectWork }) {
   const [batchSaving, setBatchSaving] = useState(false);
   const [featuredBusyId, setFeaturedBusyId] = useState('');
   const [categoryBusyId, setCategoryBusyId] = useState('');
+  const [measuredImageRatios, setMeasuredImageRatios] = useState({});
   const acc = t?.accentColor || '#ff6600';
   const isLoggedIn = Boolean(user);
   const canArrange = isLoggedIn && arrangeMode;
@@ -166,6 +168,41 @@ export default function WorksGrid({ onSelectWork }) {
     if (filter === 'video' && videoCategory) list = list.filter((work) => work.category === videoCategory);
     return list;
   }, [filter, videoCategory, works]);
+
+  useEffect(() => {
+    if (filter !== 'image') return undefined;
+    const pending = visibleWorks.filter((work) => (
+      work.type === 'image'
+      && work.file_path
+      && !imageAspectRatio(work, measuredImageRatios)
+    ));
+    const cleanups = pending.map((work) => {
+      const image = new Image();
+      image.onload = () => {
+        if (!image.naturalWidth || !image.naturalHeight) return;
+        setMeasuredImageRatios((current) => ({
+          ...current,
+          [work.id]: Number((image.naturalWidth / image.naturalHeight).toFixed(6)),
+        }));
+      };
+      image.src = assetUrl(work.file_path);
+      return () => { image.onload = null; };
+    });
+    return () => cleanups.forEach((cleanup) => cleanup());
+  }, [filter, measuredImageRatios, visibleWorks]);
+
+  const displayWorks = useMemo(() => {
+    if (filter !== 'image') return visibleWorks;
+    const groups = splitImageWorksByOrientation(visibleWorks, measuredImageRatios);
+    const items = [];
+    if (groups.landscape.length || groups.unknown.length) {
+      items.push({ __section: 'landscape', id: '__landscape' }, ...groups.landscape, ...groups.unknown);
+    }
+    if (groups.portrait.length) {
+      items.push({ __section: 'portrait', id: '__portrait' }, ...groups.portrait);
+    }
+    return items;
+  }, [filter, measuredImageRatios, visibleWorks]);
 
   const visibleWorkIds = useMemo(() => visibleWorks.map((work) => work.id), [visibleWorks]);
   const selectedVisibleCount = useMemo(
@@ -472,17 +509,28 @@ export default function WorksGrid({ onSelectWork }) {
               {filter === 'featured' ? '还没有选择精选作品' : <RichText value={t?.worksEmpty} fallback="还没有作品" />}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              {visibleWorks.map((work) => (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
+              {displayWorks.map((work) => work.__section ? (
+                <div key={work.id} className="col-span-full mt-2 flex items-center gap-3 first:mt-0">
+                  <h3 className="text-sm font-bold tracking-wide text-gray-700">
+                    {work.__section === 'portrait' ? '竖屏封面' : '横屏封面'}
+                  </h3>
+                  <span className="h-px flex-1 bg-gray-100" />
+                </div>
+              ) : (
                 <article
                   key={work.id}
                   data-work-card={work.id}
-                  className={`group relative select-none rounded-2xl transition-transform hover:-translate-y-1 ${canArrange ? 'cursor-pointer' : 'cursor-pointer'} ${selectedMoveId === work.id ? 'ring-4 ring-orange-400' : selectedMoveId ? 'ring-2 ring-dashed ring-orange-200' : ''} ${work.hidden ? 'ring-2 ring-dashed ring-gray-300' : ''} ${selectedWorkSet.has(work.id) ? 'ring-4 ring-blue-400' : ''}`}
+                  className={`group relative select-none rounded-2xl transition-transform hover:-translate-y-1 ${filter === 'image' && imageAspectRatio(work, measuredImageRatios) && imageAspectRatio(work, measuredImageRatios) < 1 ? 'md:col-span-3' : 'md:col-span-4'} ${canArrange ? 'cursor-pointer' : 'cursor-pointer'} ${selectedMoveId === work.id ? 'ring-4 ring-orange-400' : selectedMoveId ? 'ring-2 ring-dashed ring-orange-200' : ''} ${work.hidden ? 'ring-2 ring-dashed ring-gray-300' : ''} ${selectedWorkSet.has(work.id) ? 'ring-4 ring-blue-400' : ''}`}
                   onClick={() => handleWorkClick(work)}
                 >
                   <div
-                    className="relative aspect-video overflow-hidden rounded-2xl"
-                    style={{ background: '#0f1322', boxShadow: work.hidden ? '0 18px 36px rgba(15,19,34,0.08)' : '0 24px 48px rgba(15,19,34,0.12)' }}
+                    className={`relative overflow-hidden rounded-2xl ${work.type === 'image' ? '' : 'aspect-video'}`}
+                    style={{
+                      ...(work.type === 'image' ? { aspectRatio: imageAspectRatio(work, measuredImageRatios) || (16 / 9) } : {}),
+                      background: '#0f1322',
+                      boxShadow: work.hidden ? '0 18px 36px rgba(15,19,34,0.08)' : '0 24px 48px rgba(15,19,34,0.12)',
+                    }}
                   >
                     {work.type === 'image' && work.file_path ? <img src={assetUrl(work.file_path)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" /> : work.thumbnail ? <img src={assetUrl(work.thumbnail)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" /> : null}
                     <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0) 0%, rgba(6,8,18,0.04) 48%, rgba(6,8,18,0.24) 100%)' }} />

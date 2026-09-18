@@ -64,6 +64,7 @@ function createWork(data) {
     external_url: data.external_url || '',
     douyin_video_uri: data.douyin_video_uri || '',
     video_aspect_ratio: Number(data.video_aspect_ratio) || null,
+    image_aspect_ratio: Number(data.image_aspect_ratio) || null,
     tags: data.tags || [],
     category: data.type === 'video' ? (data.category || '') : '',
     hidden: Boolean(data.hidden),

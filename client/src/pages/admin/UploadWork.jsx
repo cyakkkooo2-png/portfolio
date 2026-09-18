@@ -5,7 +5,7 @@ import ProgressBar from '../../components/ProgressBar';
 import StorageBar from '../../components/StorageBar';
 import { useAuth } from '../../context/AuthContext';
 import VideoCategoryPicker from '../../components/VideoCategoryPicker';
-import { batchTitleForFile, shouldBatchUpload } from '../../utils/batch-upload';
+import { batchTitleForFile, isDuplicateUploadError, shouldBatchUpload } from '../../utils/batch-upload';
 
 const TYPES = [
   { key: 'video', label: '视频', icon: '🎬' },
@@ -42,6 +42,27 @@ function readVideoAspectRatio(videoFile) {
       reject(new Error('浏览器无法读取视频画面比例'));
     };
     video.src = objectUrl;
+  });
+}
+
+function readImageAspectRatio(imageFile) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(imageFile);
+    const cleanup = () => URL.revokeObjectURL(objectUrl);
+    image.onload = () => {
+      const ratio = image.naturalWidth && image.naturalHeight
+        ? image.naturalWidth / image.naturalHeight
+        : 0;
+      cleanup();
+      if (!ratio) reject(new Error('无法读取图片比例'));
+      else resolve(Number(ratio.toFixed(6)));
+    };
+    image.onerror = () => {
+      cleanup();
+      reject(new Error('浏览器无法读取图片比例'));
+    };
+    image.src = objectUrl;
   });
 }
 
@@ -294,6 +315,8 @@ export default function UploadWork() {
     setError('');
     setProgress({ percent: 0, speed: '正在准备批量上传…', fileName: `0/${batchFiles.length}` });
 
+    let uploadedCount = 0;
+    let skippedCount = 0;
     try {
       for (let index = 0; index < batchFiles.length; index += 1) {
         const currentFile = batchFiles[index];
@@ -326,6 +349,7 @@ export default function UploadWork() {
               },
             });
           } else {
+            const imageAspectRatio = await readImageAspectRatio(currentFile);
             const formData = new FormData();
             formData.append('title', titleFromFile);
             formData.append('description', description);
@@ -333,6 +357,7 @@ export default function UploadWork() {
             formData.append('content', content);
             formData.append('tags', JSON.stringify(tags.split(',').map((tag) => tag.trim()).filter(Boolean)));
             formData.append('category', '');
+            formData.append('imageAspectRatio', String(imageAspectRatio));
             formData.append('image', currentFile);
             await uploadWorkWithProgress(formData, {
               method: 'POST',
@@ -342,12 +367,22 @@ export default function UploadWork() {
               },
             });
           }
+          uploadedCount += 1;
         } catch (uploadError) {
-          throw new Error(`${currentFile.name} 上传失败（已成功 ${index} 个）：${uploadError.message || '请稍后重试'}`);
+          if (isDuplicateUploadError(uploadError)) {
+            skippedCount += 1;
+            setProgress({
+              percent: Math.round(((index + 1) / batchFiles.length) * 100),
+              speed: '已跳过重复文件',
+              fileName,
+            });
+            continue;
+          }
+          throw new Error(`${currentFile.name} 上传失败（已成功 ${uploadedCount} 个，跳过 ${skippedCount} 个）：${uploadError.message || '请稍后重试'}`);
         }
       }
 
-      setProgress({ percent: 100, speed: `已上传 ${batchFiles.length} 个作品`, fileName: '批量上传完成' });
+      setProgress({ percent: 100, speed: `成功 ${uploadedCount} 个，跳过重复 ${skippedCount} 个`, fileName: '批量上传完成' });
       setTimeout(() => navigate('/admin'), 900);
     } catch (err) {
       setError(err.message || '批量上传失败');
@@ -405,6 +440,9 @@ export default function UploadWork() {
           },
         });
       } else {
+        if (type === 'image') {
+          formData.append('imageAspectRatio', String(await readImageAspectRatio(file)));
+        }
         await uploadWorkWithProgress(formData, {
           method: 'POST',
           onProgress: (p) => {
