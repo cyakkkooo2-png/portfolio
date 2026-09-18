@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { externalVideoPreviewSrc, isDouyinWork } from './external-video-preview.js';
+import { externalVideoPreviewSrc, formatVideoDuration, isDouyinWork, videoMetadataSrc } from './external-video-preview.js';
 
 test('uses an imported Douyin video as its own thumbnail when no cover exists', () => {
   const work = {
@@ -21,4 +21,17 @@ test('keeps an existing cover instead of loading the video preview', () => {
     tags: ['抖音'],
     thumbnail: '/uploads/images/cover.jpg',
   }), '');
+});
+
+test('uses the same-origin video endpoint for Douyin duration metadata', () => {
+  assert.equal(videoMetadataSrc({
+    id: 'work-2',
+    type: 'video',
+    tags: ['抖音'],
+  }), '/api/works/work-2/douyin-video');
+});
+
+test('formats short and long video durations', () => {
+  assert.equal(formatVideoDuration(41.9), '00:41');
+  assert.equal(formatVideoDuration(3725), '1:02:05');
 });

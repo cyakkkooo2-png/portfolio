@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 import { VIDEO_CATEGORIES } from '../utils/video-categories';
 import { imageAspectRatio, splitImageWorksByOrientation } from '../utils/image-layout';
-import { externalVideoPreviewSrc } from '../utils/external-video-preview';
+import { externalVideoPreviewSrc, formatVideoDuration, videoMetadataSrc } from '../utils/external-video-preview';
 
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
@@ -147,11 +147,19 @@ export default function WorksGrid({ onSelectWork }) {
   const [featuredBusyId, setFeaturedBusyId] = useState('');
   const [categoryBusyId, setCategoryBusyId] = useState('');
   const [coverBusyId, setCoverBusyId] = useState('');
+  const [videoDurations, setVideoDurations] = useState({});
   const [measuredImageRatios, setMeasuredImageRatios] = useState({});
   const acc = t?.accentColor || '#ff6600';
   const isLoggedIn = Boolean(user);
   const canArrange = isLoggedIn && arrangeMode;
   const selectedWorkSet = useMemo(() => new Set(selectedWorkIds), [selectedWorkIds]);
+
+  function rememberVideoDuration(workId, duration) {
+    if (!workId || !Number.isFinite(duration) || duration <= 0) return;
+    setVideoDurations((current) => (
+      current[workId] === duration ? current : { ...current, [workId]: duration }
+    ));
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -572,12 +580,24 @@ export default function WorksGrid({ onSelectWork }) {
                         aria-label={`${work.title} 视频封面`}
                         onLoadedMetadata={(event) => {
                           const video = event.currentTarget;
+                          rememberVideoDuration(work.id, video.duration);
                           if (Number.isFinite(video.duration) && video.duration > 0) {
                             video.currentTime = Math.min(0.15, video.duration / 10);
                           }
                         }}
                       />
                     ) : null}
+                    {work.type === 'video' && videoMetadataSrc(work) && !externalVideoPreviewSrc(work) && !videoDurations[work.id] && (
+                      <video
+                        src={videoMetadataSrc(work)}
+                        className="pointer-events-none absolute h-px w-px opacity-0"
+                        muted
+                        playsInline
+                        preload="metadata"
+                        aria-hidden="true"
+                        onLoadedMetadata={(event) => rememberVideoDuration(work.id, event.currentTarget.duration)}
+                      />
+                    )}
                     <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0) 0%, rgba(6,8,18,0.04) 48%, rgba(6,8,18,0.24) 100%)' }} />
                     {isLoggedIn && !canArrange && (
                       <button
@@ -642,7 +662,13 @@ export default function WorksGrid({ onSelectWork }) {
                         />
                       </label>
                     )}
-                    <div className="absolute bottom-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-lg text-white opacity-0 transition-opacity group-hover:opacity-100" style={{ background: acc }}>→</div>
+                    {work.type === 'video' ? (
+                      <span className="absolute bottom-3 right-3 z-10 rounded-[3px] bg-black/80 px-2 py-1 text-sm font-bold leading-none tabular-nums text-white shadow-sm">
+                        {videoDurations[work.id] ? formatVideoDuration(videoDurations[work.id]) : '--:--'}
+                      </span>
+                    ) : (
+                      <div className="absolute bottom-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-lg text-white opacity-0 transition-opacity group-hover:opacity-100" style={{ background: acc }}>→</div>
+                    )}
                   </div>
 
                   <div className="relative mt-3 px-1">
