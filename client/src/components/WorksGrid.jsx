@@ -663,7 +663,7 @@ export default function WorksGrid({ onSelectWork }) {
                       </label>
                     )}
                     {work.type === 'video' ? (
-                      <span className="absolute bottom-3 right-3 z-10 rounded-[3px] bg-black/80 px-2 py-1 text-sm font-bold leading-none tabular-nums text-white shadow-sm">
+                      <span className="absolute bottom-3 right-3 z-10 text-sm font-bold leading-none tabular-nums text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]">
                         {videoDurations[work.id] ? formatVideoDuration(videoDurations[work.id]) : '--:--'}
                       </span>
                     ) : (
