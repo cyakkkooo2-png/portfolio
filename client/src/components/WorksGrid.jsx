@@ -5,6 +5,7 @@ import { RichText, txt, useTheme } from '../context/ThemeContext';
 import { VIDEO_CATEGORIES } from '../utils/video-categories';
 import { imageAspectRatio, splitImageWorksByOrientation } from '../utils/image-layout';
 import { externalVideoPreviewSrc, formatVideoDuration, videoMetadataSrc } from '../utils/external-video-preview';
+import { moveSelectedWorksToBottom } from '../utils/work-order';
 
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
@@ -414,6 +415,16 @@ export default function WorksGrid({ onSelectWork }) {
     }
   }
 
+  async function batchMoveToBottom() {
+    const ids = selectedWorkIds.filter((id) => works.some((work) => work.id === id));
+    if (!ids.length || savingOrder) return;
+
+    const nextWorks = moveSelectedWorksToBottom(works, ids);
+    setSelectedMoveId('');
+    await saveOrder(nextWorks);
+    setSelectedWorkIds([]);
+  }
+
   return (
     <section id="work" className="relative px-6 py-24 md:px-20" style={{ background: '#fff' }}>
       <div className="mx-auto max-w-6xl">
@@ -436,8 +447,34 @@ export default function WorksGrid({ onSelectWork }) {
                 {arrangeMode ? '退出排序模式' : '开启排序模式'}
               </button>
               {arrangeMode && (
-                <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-600">
-                  <span>{savingOrder ? '正在保存排序…' : selectedMoveId ? '已选中作品：再点击目标作品即可移动；点击同一张可取消' : '排序模式：先点要移动的作品，再点目标位置'}</span>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-600">
+                    <span>{savingOrder ? '正在保存排序…' : selectedMoveId ? '已选中作品：再点击目标作品即可移动；点击同一张可取消' : '点卡片可单个移动，也可勾选多个作品批量移到底部'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={selectAllVisible}
+                    className="rounded-full bg-gray-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-45"
+                    disabled={!visibleWorkIds.length || savingOrder}
+                  >
+                    全选当前
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearSelectedWorks}
+                    className="rounded-full bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-600 disabled:opacity-45"
+                    disabled={!selectedWorkIds.length || savingOrder}
+                  >
+                    全不选
+                  </button>
+                  <button
+                    type="button"
+                    onClick={batchMoveToBottom}
+                    className="rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 disabled:opacity-45"
+                    disabled={!selectedWorkIds.length || savingOrder}
+                  >
+                    {savingOrder ? '移动中…' : `所选移到底部${selectedWorkIds.length ? `（${selectedWorkIds.length}）` : ''}`}
+                  </button>
                 </div>
               )}
               {!arrangeMode && (
@@ -599,7 +636,7 @@ export default function WorksGrid({ onSelectWork }) {
                       />
                     )}
                     <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0) 0%, rgba(6,8,18,0.04) 48%, rgba(6,8,18,0.24) 100%)' }} />
-                    {isLoggedIn && !canArrange && (
+                    {isLoggedIn && (
                       <button
                         type="button"
                         onClick={(event) => handleToggleVisibility(event, work)}
@@ -628,7 +665,7 @@ export default function WorksGrid({ onSelectWork }) {
                         onClick={(event) => toggleSelectedWork(event, work.id)}
                         className="absolute right-4 top-4 z-20 flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105"
                         style={selectedWorkSet.has(work.id) ? { background: '#2563eb', color: '#fff' } : { background: 'rgba(255,255,255,0.95)', color: '#4b5563' }}
-                        title="选择作品用于批量隐藏或显示"
+                        title={canArrange ? '选择作品用于批量移到底部' : '选择作品用于批量隐藏或显示'}
                       >
                         {selectedWorkSet.has(work.id) ? '✓' : '选'}
                       </button>
@@ -663,7 +700,7 @@ export default function WorksGrid({ onSelectWork }) {
                       </label>
                     )}
                     {work.type === 'video' ? (
-                      <span className="absolute bottom-3 right-3 z-10 text-sm font-bold leading-none tabular-nums text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]">
+                      <span className="absolute bottom-3 right-3 z-10 text-sm font-bold leading-none tabular-nums text-white drop-shadow-[0_1px_0_rgba(0,0,0,0.8)]">
                         {videoDurations[work.id] ? formatVideoDuration(videoDurations[work.id]) : '--:--'}
                       </span>
                     ) : (

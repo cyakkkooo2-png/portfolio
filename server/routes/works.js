@@ -12,6 +12,7 @@ const vodStorage = require('../vod-storage');
 const { extractDouyinVideoId, extractDouyinMedia, buildDouyinRequestHeaders } = require('../douyin-media');
 const { generateABogus } = require('../douyin-sign');
 const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
+const { isPconlineVideoUrl, normalizePconlineVideoUrl } = require('../pconline-video');
 
 const router = express.Router();
 
@@ -531,8 +532,8 @@ async function extractFromUrl(inputUrl, options = {}) {
   let pageUrl = extractSharedUrl(inputUrl);
   if (!/^https?:\/\//i.test(pageUrl)) throw new Error('请输入完整链接，例如 https://...');
 
-  const pcVideoId = /pconline\.pcvideo\.com\.cn\/video-(\d+)\.html/i.exec(pageUrl)?.[1];
-  if (pcVideoId) pageUrl = `https://mpconline.pcvideo.com.cn/${pcVideoId}.html`;
+  const isPconlineVideo = isPconlineVideoUrl(pageUrl);
+  if (isPconlineVideo) pageUrl = normalizePconlineVideoUrl(pageUrl);
 
   const fetchedPage = await fetchHtml(pageUrl);
   const html = fetchedPage.html;
@@ -574,7 +575,7 @@ async function extractFromUrl(inputUrl, options = {}) {
   ]);
   const tags = pickAll(html, /<span[^>]+class=["'][^"']*\btag\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi);
   const forceType = ['video', 'article'].includes(options.type) ? options.type : '';
-  const resolvedType = forceType || ((videoUrl || isBilibili || isDouyin) ? 'video' : 'article');
+  const resolvedType = forceType || ((videoUrl || isBilibili || isDouyin || isPconlineVideo) ? 'video' : 'article');
   const resolvedVideoUrl = resolvedType === 'video' && !isBilibili && !isDouyin ? videoUrl : '';
   const articleHtml = resolvedType === 'article' ? extractArticleHtml(html, sourceUrl) : '';
   const manualArticleContent = String(options.content || '').trim();

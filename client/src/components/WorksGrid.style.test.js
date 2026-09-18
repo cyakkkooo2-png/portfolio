@@ -9,4 +9,5 @@ test('video duration is rendered as white text without a background badge', () =
   assert.ok(durationClass, 'duration label should use tabular numerals');
   assert.match(durationClass[1], /text-white/);
   assert.doesNotMatch(durationClass[1], /bg-/);
+  assert.match(durationClass[1], /drop-shadow-\[0_1px_0_rgba\(0,0,0,0\.8\)\]/);
 });
