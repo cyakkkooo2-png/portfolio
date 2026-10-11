@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import VideoPlayer from './VideoPlayer';
 import {
   douyinStageStyle,
   resolveDouyinPlayerSize,
 } from '../utils/douyin-player';
+import { bilibiliPlayerSrc, feishuPlayerSrc } from '../utils/external-player';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
 
@@ -78,7 +79,6 @@ export default function WorkDetailModal({ work, onClose }) {
   const acc = '#ff6600';
   const [videoRatio, setVideoRatio] = useState(() => savedVideoRatio(work));
   const [videoError, setVideoError] = useState(false);
-  const qualityControlTargetRef = useRef(null);
   const isExternalVideo = work?.type === 'video'
     && /^https?:\/\//i.test(work?.file_path || '')
     && !isTencentVodUrl(work?.file_path || '');
@@ -87,6 +87,9 @@ export default function WorkDetailModal({ work, onClose }) {
   const linkPlatform = externalVideoPlatform(work, originalUrl);
   const douyinId = douyinVideoId(originalUrl);
   const isDouyinEmbed = isLinkOnlyVideo && Boolean(douyinId);
+  const bilibiliEmbedSrc = isLinkOnlyVideo ? bilibiliPlayerSrc(work) : '';
+  const feishuEmbedSrc = isLinkOnlyVideo ? feishuPlayerSrc(work) : '';
+  const isWebPlayerEmbed = Boolean(bilibiliEmbedSrc || feishuEmbedSrc);
   const douyinPlayerSize = resolveDouyinPlayerSize(work);
   const displayRatio = videoRatio;
   const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
@@ -108,9 +111,9 @@ export default function WorkDetailModal({ work, onClose }) {
   }, [onClose]);
 
   useEffect(() => {
-    setVideoRatio(isDouyinEmbed ? douyinPlayerSize.ratio : savedVideoRatio(work));
+    setVideoRatio(isDouyinEmbed ? douyinPlayerSize.ratio : (isWebPlayerEmbed ? 16 / 9 : savedVideoRatio(work)));
     setVideoError(false);
-  }, [work?.id, work?.video_aspect_ratio, isDouyinEmbed, douyinPlayerSize.ratio]);
+  }, [work?.id, work?.video_aspect_ratio, isDouyinEmbed, isWebPlayerEmbed, douyinPlayerSize.ratio]);
 
   if (!work) return null;
 
@@ -169,6 +172,15 @@ export default function WorkDetailModal({ work, onClose }) {
                 </div>
               )}
             </div>
+          ) : work.type === 'video' && isWebPlayerEmbed ? (
+            <iframe
+              src={bilibiliEmbedSrc || feishuEmbedSrc}
+              title={`${work.title || (bilibiliEmbedSrc ? 'B站' : '飞书')}播放器`}
+              className="h-full w-full border-0 bg-black"
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
           ) : work.type === 'video' && isLinkOnlyVideo ? (
             <div className="relative h-full w-full">
               {work.thumbnail ? (
@@ -204,7 +216,6 @@ export default function WorkDetailModal({ work, onClose }) {
                 }}
                 onCanPlay={() => setVideoError(false)}
                 onError={() => setVideoError(true)}
-                qualityControlTargetRef={qualityControlTargetRef}
               />
               {isExternalVideo && videoError && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.28), rgba(0,0,0,0.82))' }}>
@@ -245,9 +256,6 @@ export default function WorkDetailModal({ work, onClose }) {
               <TypeIcon type={work.type} />
               {labels[work.type]}
             </span>
-            {work.type === 'video' && !isDouyinEmbed && (
-              <div className="flex justify-end" ref={qualityControlTargetRef} />
-            )}
           </div>
           <h2 className="mb-3 text-2xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
             {work.title}
@@ -277,7 +285,7 @@ export default function WorkDetailModal({ work, onClose }) {
             </a>
           )}
 
-          {(work.external_url || work.source_url) && !isExternalVideo && !isDouyinEmbed && work.type !== 'article' && (
+          {(work.external_url || work.source_url) && !isExternalVideo && !isDouyinEmbed && !isWebPlayerEmbed && work.type !== 'article' && (
             <button
               type="button"
               onClick={() => openCurrentTab(work.external_url || work.source_url)}

@@ -231,7 +231,7 @@ function UrlImportCard({ onImported }) {
       <div className="flex flex-col gap-4 md:flex-row md:items-end">
         <div className="flex-1">
           <h2 className="text-base font-bold text-gray-900">网页链接导入</h2>
-          <p className="mt-1 text-sm text-gray-500">支持抖音短链接、整段抖音分享文案，以及你拥有授权的视频页或文章页链接。文章会导入为站内内容，不嵌入站外页面。</p>
+          <p className="mt-1 text-sm text-gray-500">支持飞书视频、B站、抖音短链接及普通视频页。飞书视频需开启“互联网获得链接的人可阅读”；文章会导入为站内内容。</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {[
               { key: 'auto', label: '自动识别' },
@@ -258,7 +258,7 @@ function UrlImportCard({ onImported }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             className="mt-4 w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            placeholder={importType === 'article' ? 'https://example.com/article.html' : '粘贴抖音分享文案或 https://v.douyin.com/...'}
+            placeholder={importType === 'article' ? 'https://example.com/article.html' : '粘贴飞书、B站或抖音视频链接'}
           />
           {importType === 'article' && (
             <div className="mt-4 rounded-lg border border-blue-100 bg-white/80 p-4">
