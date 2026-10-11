@@ -4,6 +4,7 @@ import { getWork } from '../api';
 import VideoPlayer from '../components/VideoPlayer';
 import ImageGallery from '../components/ImageGallery';
 import ArticleViewer from '../components/ArticleViewer';
+import WorkDescription from '../components/WorkDescription';
 
 const typeLabels = { video: '视频', image: '图片', article: '文章' };
 
@@ -72,9 +73,7 @@ export default function WorkDetail() {
             {typeLabels[work.type]}
           </span>
           <h1 className="text-3xl font-bold text-white mt-3 mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>{work.title}</h1>
-          {work.description && (
-            <p className="text-gray-400 leading-relaxed">{work.description}</p>
-          )}
+          <WorkDescription work={work} className="text-gray-400 leading-relaxed" />
           <p className="text-xs text-gray-600 mt-3">
             发布于 {new Date(work.created_at).toLocaleDateString('zh-CN')}
           </p>

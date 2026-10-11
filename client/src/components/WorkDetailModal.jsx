@@ -6,6 +6,7 @@ import {
 } from '../utils/douyin-player';
 import { bilibiliPlayerSrc } from '../utils/external-player';
 import { isFeishuWork } from '../utils/external-video-preview';
+import WorkDescription from './WorkDescription';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
 
@@ -261,7 +262,7 @@ export default function WorkDetailModal({ work, onClose }) {
           <h2 className="mb-3 text-2xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
             {work.title}
           </h2>
-          {work.description && <p className="mb-5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }}>{work.description}</p>}
+          <WorkDescription work={work} className="mb-5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }} />
 
           {work.type === 'article' && work.content && (
             <div className="mt-4 space-y-4 pt-5 leading-relaxed" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.62)', lineHeight: 1.9 }}>
