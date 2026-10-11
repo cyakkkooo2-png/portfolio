@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   extractDouyinVideoId,
   extractDouyinMedia,
+  extractDouyinTitle,
   buildDouyinRequestHeaders,
 } = require('../douyin-media');
 
@@ -55,6 +56,22 @@ test('extracts landscape media from percent-encoded Douyin page state', () => {
     ratio: 1.7778,
     uri: 'v0300fg10000ck7clvrc77u5pj7nnkig',
   });
+});
+
+test('extracts a title from percent-encoded Douyin page state', () => {
+  const state = encodeURIComponent(JSON.stringify({
+    loaderData: {
+      videoDetail: {
+        awemeId: '7273811545082072355',
+        desc: '这可能是你离轿跑梦最近的一次了…#新能源汽车',
+      },
+    },
+  }));
+
+  assert.equal(
+    extractDouyinTitle(`<script>${state}</script>`),
+    '这可能是你离轿跑梦最近的一次了…#新能源汽车',
+  );
 });
 
 test('omits an empty Range header so normal browser playback is accepted', () => {

@@ -9,7 +9,7 @@ const { authMiddleware, optionalAuthMiddleware } = require('../middleware/auth')
 const githubStorage = require('../github-storage');
 const cosStorage = require('../cos-storage');
 const vodStorage = require('../vod-storage');
-const { extractDouyinVideoId, extractDouyinMedia, buildDouyinRequestHeaders } = require('../douyin-media');
+const { extractDouyinVideoId, extractDouyinMedia, extractDouyinTitle, buildDouyinRequestHeaders } = require('../douyin-media');
 const { generateABogus } = require('../douyin-sign');
 const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
 const { isPconlineVideoUrl, normalizePconlineVideoUrl } = require('../pconline-video');
@@ -535,11 +535,19 @@ async function extractFromUrl(inputUrl, options = {}) {
   if (isPconlineVideo) pageUrl = normalizePconlineVideoUrl(pageUrl);
 
   const isFeishu = isFeishuFileUrl(pageUrl);
+  const isInitialDouyin = isDouyinUrl(pageUrl);
+  const initialDouyinId = isInitialDouyin ? extractDouyinVideoId(pageUrl) : '';
+  const douyinPageUrl = initialDouyinId ? `https://www.douyin.com/video/${initialDouyinId}` : pageUrl;
   const fetchedPage = isFeishu
     ? await fetchFeishuPage(pageUrl)
-    : shouldFetchBilibiliPage(pageUrl)
-      ? await fetchHtml(pageUrl)
-    : { html: '', finalUrl: pageUrl };
+    : isInitialDouyin
+      ? await fetchHtml(douyinPageUrl).catch((err) => {
+        console.warn('Douyin page metadata fallback:', err.message);
+        return { html: '', finalUrl: pageUrl };
+      })
+      : shouldFetchBilibiliPage(pageUrl)
+        ? await fetchHtml(pageUrl)
+        : { html: '', finalUrl: pageUrl };
   const html = fetchedPage.html;
   const sourceUrl = fetchedPage.finalUrl || pageUrl;
   const feishuTitle = isFeishu ? extractFeishuTitle(html) : '';
@@ -550,15 +558,14 @@ async function extractFromUrl(inputUrl, options = {}) {
     console.warn('Douyin import metadata fallback:', err.message);
     return null;
   }) : null;
-  const douyinMedia = isDouyin ? (extractDouyinMedia(html) || douyinApiMedia) : null;
+  const douyinMedia = isDouyin ? (douyinApiMedia || extractDouyinMedia(html)) : null;
   const douyinAspectRatio = douyinMedia?.ratio || (isDouyin ? extractDouyinAspectRatio(html) : null);
   const isBilibili = !isDouyin && (isBilibiliUrl(pageUrl) || isBilibiliUrl(sourceUrl));
   const bilibiliMeta = isBilibili ? await fetchBilibiliMeta(inputUrl, html).catch((err) => {
     console.warn('Bilibili API fallback failed:', err.message);
     return null;
   }) : null;
-  const douyinDescription = isDouyin ? (douyinApiMedia?.title || pick(html, [
-    /"desc"\s*:\s*"((?:\\.|[^"\\])*)"/i,
+  const douyinDescription = isDouyin ? (douyinApiMedia?.title || extractDouyinTitle(html) || pick(html, [
     /"seoTitle"\s*:\s*"((?:\\.|[^"\\])*)"/i,
   ]).replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => String.fromCharCode(parseInt(code, 16))).replace(/\\n/g, ' ').replace(/\\"/g, '"').trim()) : '';
   const title = (isDouyin ? pickMetaContent(html, ['og:title', 'twitter:title']) : '') || pick(html, [

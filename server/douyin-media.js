@@ -129,8 +129,42 @@ function buildDouyinRequestHeaders({ range = '', accept = '' } = {}) {
   return headers;
 }
 
+function titleFromObject(root) {
+  const queue = [root];
+  const visited = new Set();
+  while (queue.length) {
+    const value = queue.shift();
+    if (!value || typeof value !== 'object' || visited.has(value)) continue;
+    visited.add(value);
+
+    const title = String(value.desc || value.description || '').trim();
+    const isAweme = value.awemeId || value.aweme_id || value.groupId || value.group_id;
+    if (title && isAweme) return title;
+
+    if (Array.isArray(value)) queue.push(...value);
+    else queue.push(...Object.values(value));
+  }
+  return '';
+}
+
+function extractDouyinTitle(html = '') {
+  for (const data of parseJsonCandidates(html)) {
+    const title = titleFromObject(data);
+    if (title) return title;
+  }
+
+  const raw = String(html).match(/"desc"\s*:\s*"((?:\\.|[^"\\])*)"/i)?.[1] || '';
+  if (!raw) return '';
+  try {
+    return JSON.parse(`"${raw}"`).trim();
+  } catch {
+    return raw.replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => String.fromCharCode(parseInt(code, 16))).trim();
+  }
+}
+
 module.exports = {
   extractDouyinVideoId,
   extractDouyinMedia,
+  extractDouyinTitle,
   buildDouyinRequestHeaders,
 };
