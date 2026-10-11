@@ -19,7 +19,6 @@ export function isFeishuWork(work = {}) {
 export function externalVideoPreviewSrc(work = {}) {
   if (work.type !== 'video' || work.thumbnail || !work.id) return '';
   if (isDouyinWork(work)) return `/api/works/${work.id}/douyin-video`;
-  if (isFeishuWork(work)) return `/api/works/${work.id}/feishu-video`;
   return '';
 }
 
@@ -30,7 +29,6 @@ function isTencentVodUrl(url = '') {
 export function videoMetadataSrc(work = {}) {
   if (work.type !== 'video') return '';
   if (isDouyinWork(work) && work.id && !work.file_path) return `/api/works/${work.id}/douyin-video`;
-  if (isFeishuWork(work) && work.id && !work.file_path) return `/api/works/${work.id}/feishu-video`;
   const url = String(work.file_path || '');
   if (!url) return '';
   if (url.startsWith('/uploads/') || isTencentVodUrl(url)) return url;

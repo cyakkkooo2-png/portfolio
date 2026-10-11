@@ -31,15 +31,15 @@ test('uses the same-origin video endpoint for Douyin duration metadata', () => {
   }), '/api/works/work-2/douyin-video');
 });
 
-test('uses the site player endpoints for a public Feishu file', () => {
+test('recognizes a public Feishu file without preloading it in the works grid', () => {
   const work = {
     id: 'work-feishu',
     type: 'video',
     source_url: 'https://my.feishu.cn/file/BWRTbxFlEoL5AYxRMrfca9CNngg',
   };
   assert.equal(isFeishuWork(work), true);
-  assert.equal(externalVideoPreviewSrc(work), '/api/works/work-feishu/feishu-video');
-  assert.equal(videoMetadataSrc(work), '/api/works/work-feishu/feishu-video');
+  assert.equal(externalVideoPreviewSrc(work), '');
+  assert.equal(videoMetadataSrc(work), '');
 });
 
 test('formats short and long video durations', () => {
