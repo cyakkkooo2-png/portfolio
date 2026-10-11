@@ -1,12 +1,16 @@
-import { FALLBACK_LINK_TEXT, safeFeishuFallbackUrl } from '../utils/work-description';
+import {
+  ARTICLE_FALLBACK_LINK_TEXT,
+  FALLBACK_LINK_TEXT,
+  safeArticleOriginalUrl,
+  safeFeishuFallbackUrl,
+} from '../utils/work-description';
 
-export function FallbackLinkBadge({ work, className = '', style }) {
-  const fallbackUrl = safeFeishuFallbackUrl(work);
-  if (!fallbackUrl) return null;
+function CompactFallbackBadge({ href, children, className = '', style }) {
+  if (!href) return null;
 
   return (
     <a
-      href={fallbackUrl}
+      href={href}
       target="_blank"
       rel="noreferrer"
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold leading-5 no-underline transition duration-200 hover:-translate-y-px hover:brightness-125 ${className}`}
@@ -18,8 +22,26 @@ export function FallbackLinkBadge({ work, className = '', style }) {
         ...style,
       }}
     >
-      {FALLBACK_LINK_TEXT}
+      {children}
     </a>
+  );
+}
+
+export function FallbackLinkBadge({ work, className = '', style }) {
+  const fallbackUrl = safeFeishuFallbackUrl(work);
+  return (
+    <CompactFallbackBadge href={fallbackUrl} className={className} style={style}>
+      {FALLBACK_LINK_TEXT}
+    </CompactFallbackBadge>
+  );
+}
+
+export function ArticleFallbackLinkBadge({ work, className = '', style }) {
+  const originalUrl = safeArticleOriginalUrl(work);
+  return (
+    <CompactFallbackBadge href={originalUrl} className={className} style={style}>
+      {ARTICLE_FALLBACK_LINK_TEXT}
+    </CompactFallbackBadge>
   );
 }
 

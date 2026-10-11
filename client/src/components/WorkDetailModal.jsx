@@ -6,7 +6,7 @@ import {
 } from '../utils/douyin-player';
 import { bilibiliPlayerSrc } from '../utils/external-player';
 import { isFeishuWork } from '../utils/external-video-preview';
-import WorkDescription, { FallbackLinkBadge } from './WorkDescription';
+import WorkDescription, { ArticleFallbackLinkBadge, FallbackLinkBadge } from './WorkDescription';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
 
@@ -260,6 +260,7 @@ export default function WorkDetailModal({ work, onClose }) {
                 {labels[work.type]}
               </span>
               <FallbackLinkBadge work={work} />
+              <ArticleFallbackLinkBadge work={work} />
             </div>
           </div>
           <h2 className="mb-3 text-2xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
