@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { externalVideoPreviewSrc, formatVideoDuration, isDouyinWork, videoMetadataSrc } from './external-video-preview.js';
+import { externalVideoPreviewSrc, formatVideoDuration, isDouyinWork, isFeishuWork, videoMetadataSrc } from './external-video-preview.js';
 
 test('uses an imported Douyin video as its own thumbnail when no cover exists', () => {
   const work = {
@@ -29,6 +29,17 @@ test('uses the same-origin video endpoint for Douyin duration metadata', () => {
     type: 'video',
     tags: ['抖音'],
   }), '/api/works/work-2/douyin-video');
+});
+
+test('uses the site player endpoints for a public Feishu file', () => {
+  const work = {
+    id: 'work-feishu',
+    type: 'video',
+    source_url: 'https://my.feishu.cn/file/BWRTbxFlEoL5AYxRMrfca9CNngg',
+  };
+  assert.equal(isFeishuWork(work), true);
+  assert.equal(externalVideoPreviewSrc(work), '/api/works/work-feishu/feishu-video');
+  assert.equal(videoMetadataSrc(work), '/api/works/work-feishu/feishu-video');
 });
 
 test('formats short and long video durations', () => {

@@ -4,7 +4,8 @@ import {
   douyinStageStyle,
   resolveDouyinPlayerSize,
 } from '../utils/douyin-player';
-import { bilibiliPlayerSrc, feishuPlayerSrc } from '../utils/external-player';
+import { bilibiliPlayerSrc } from '../utils/external-player';
+import { isFeishuWork } from '../utils/external-video-preview';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
 
@@ -87,9 +88,9 @@ export default function WorkDetailModal({ work, onClose }) {
   const linkPlatform = externalVideoPlatform(work, originalUrl);
   const douyinId = douyinVideoId(originalUrl);
   const isDouyinEmbed = isLinkOnlyVideo && Boolean(douyinId);
+  const isFeishuProxy = isLinkOnlyVideo && isFeishuWork(work);
   const bilibiliEmbedSrc = isLinkOnlyVideo ? bilibiliPlayerSrc(work) : '';
-  const feishuEmbedSrc = isLinkOnlyVideo ? feishuPlayerSrc(work) : '';
-  const isWebPlayerEmbed = Boolean(bilibiliEmbedSrc || feishuEmbedSrc);
+  const isWebPlayerEmbed = Boolean(bilibiliEmbedSrc);
   const douyinPlayerSize = resolveDouyinPlayerSize(work);
   const displayRatio = videoRatio;
   const portraitVideo = work?.type === 'video' && displayRatio < 0.9;
@@ -150,11 +151,11 @@ export default function WorkDetailModal({ work, onClose }) {
             maxHeight: work.type === 'article' ? '34vh' : `${videoStageHeight}dvh`,
           }}
         >
-          {work.type === 'video' && isDouyinEmbed ? (
+          {work.type === 'video' && (isDouyinEmbed || isFeishuProxy) ? (
             <div className="relative h-full w-full overflow-hidden bg-black">
               <VideoPlayer
-                src={`/api/works/${work.id}/douyin-video`}
-                title={work.title || '抖音视频'}
+                src={`/api/works/${work.id}/${isFeishuProxy ? 'feishu-video' : 'douyin-video'}`}
+                title={work.title || (isFeishuProxy ? '飞书视频' : '抖音视频')}
                 containerClassName="h-full w-full bg-black"
                 className="h-full w-full object-contain"
                 onLoadedMetadata={(event) => {
@@ -174,8 +175,8 @@ export default function WorkDetailModal({ work, onClose }) {
             </div>
           ) : work.type === 'video' && isWebPlayerEmbed ? (
             <iframe
-              src={bilibiliEmbedSrc || feishuEmbedSrc}
-              title={`${work.title || (bilibiliEmbedSrc ? 'B站' : '飞书')}播放器`}
+              src={bilibiliEmbedSrc}
+              title={`${work.title || 'B站'}播放器`}
               className="h-full w-full border-0 bg-black"
               allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
               allowFullScreen
@@ -285,7 +286,7 @@ export default function WorkDetailModal({ work, onClose }) {
             </a>
           )}
 
-          {(work.external_url || work.source_url) && !isExternalVideo && !isDouyinEmbed && !isWebPlayerEmbed && work.type !== 'article' && (
+          {(work.external_url || work.source_url) && !isExternalVideo && !isDouyinEmbed && !isFeishuProxy && !isWebPlayerEmbed && work.type !== 'article' && (
             <button
               type="button"
               onClick={() => openCurrentTab(work.external_url || work.source_url)}

@@ -174,6 +174,14 @@ export default function WorksGrid({ onSelectWork }) {
     if (filter === 'image') list = list.filter((work) => work.type === 'image');
     if (filter === 'article') list = list.filter((work) => work.type === 'article');
     if (filter === 'video' && videoCategory) list = list.filter((work) => work.category === videoCategory);
+    // In the mixed "all works" view, keep the owner's existing order within
+    // each group while placing every image after videos and articles.
+    if (filter === 'all') {
+      list = [
+        ...list.filter((work) => work.type !== 'image'),
+        ...list.filter((work) => work.type === 'image'),
+      ];
+    }
     return list;
   }, [filter, videoCategory, works]);
 

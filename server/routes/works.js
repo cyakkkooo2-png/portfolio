@@ -15,6 +15,12 @@ const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths
 const { isPconlineVideoUrl, normalizePconlineVideoUrl } = require('../pconline-video');
 const { bilibiliFallbackTitle, extractBilibiliIds, isBilibiliUrl, shouldFetchBilibiliPage } = require('../bilibili-url');
 const { extractFeishuTitle, isFeishuFileUrl } = require('../feishu-url');
+const {
+  buildFeishuStreamHeaders,
+  extractFeishuToken,
+  feishuOriginalVideoUrl,
+  fetchFeishuPage,
+} = require('../feishu-media');
 
 const router = express.Router();
 
@@ -407,9 +413,11 @@ async function fetchDouyinApiMedia(id) {
   });
   if (!response.ok) throw new Error(`抖音详情接口返回 ${response.status}`);
   const json = await response.json();
-  const media = extractDouyinMedia(JSON.stringify(json?.aweme_detail || json));
+  const detail = json?.aweme_detail || json;
+  const media = extractDouyinMedia(JSON.stringify(detail));
   if (!media?.url) throw new Error('抖音详情接口未返回原视频');
-  return media;
+  const title = String(detail?.desc || detail?.aweme_info?.desc || '').trim();
+  return { ...media, ...(title ? { title } : {}) };
 }
 
 async function fetchDouyinMedia(work) {
@@ -527,25 +535,32 @@ async function extractFromUrl(inputUrl, options = {}) {
   if (isPconlineVideo) pageUrl = normalizePconlineVideoUrl(pageUrl);
 
   const isFeishu = isFeishuFileUrl(pageUrl);
-  const fetchedPage = shouldFetchBilibiliPage(pageUrl)
-    ? await fetchHtml(pageUrl)
+  const fetchedPage = isFeishu
+    ? await fetchFeishuPage(pageUrl)
+    : shouldFetchBilibiliPage(pageUrl)
+      ? await fetchHtml(pageUrl)
     : { html: '', finalUrl: pageUrl };
   const html = fetchedPage.html;
   const sourceUrl = fetchedPage.finalUrl || pageUrl;
   const feishuTitle = isFeishu ? extractFeishuTitle(html) : '';
   const structuredArticle = findStructuredArticle(html);
   const isDouyin = isDouyinUrl(pageUrl) || isDouyinUrl(sourceUrl);
-  const douyinMedia = isDouyin ? extractDouyinMedia(html) : null;
+  const douyinId = isDouyin ? extractDouyinVideoId(`${pageUrl} ${sourceUrl} ${html}`) : '';
+  const douyinApiMedia = douyinId ? await fetchDouyinApiMedia(douyinId).catch((err) => {
+    console.warn('Douyin import metadata fallback:', err.message);
+    return null;
+  }) : null;
+  const douyinMedia = isDouyin ? (extractDouyinMedia(html) || douyinApiMedia) : null;
   const douyinAspectRatio = douyinMedia?.ratio || (isDouyin ? extractDouyinAspectRatio(html) : null);
   const isBilibili = !isDouyin && (isBilibiliUrl(pageUrl) || isBilibiliUrl(sourceUrl));
   const bilibiliMeta = isBilibili ? await fetchBilibiliMeta(inputUrl, html).catch((err) => {
     console.warn('Bilibili API fallback failed:', err.message);
     return null;
   }) : null;
-  const douyinDescription = isDouyin ? pick(html, [
+  const douyinDescription = isDouyin ? (douyinApiMedia?.title || pick(html, [
     /"desc"\s*:\s*"((?:\\.|[^"\\])*)"/i,
     /"seoTitle"\s*:\s*"((?:\\.|[^"\\])*)"/i,
-  ]).replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => String.fromCharCode(parseInt(code, 16))).replace(/\\n/g, ' ').replace(/\\"/g, '"').trim() : '';
+  ]).replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => String.fromCharCode(parseInt(code, 16))).replace(/\\n/g, ' ').replace(/\\"/g, '"').trim()) : '';
   const title = (isDouyin ? pickMetaContent(html, ['og:title', 'twitter:title']) : '') || pick(html, [
     /<p[^>]+class=["'][^"']*\btit\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i,
     /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
@@ -1003,6 +1018,52 @@ router.get('/:id/douyin-video', async (req, res) => {
   } catch (err) {
     console.error('Douyin video proxy error:', err.message);
     res.status(502).send('抖音视频流暂时无法读取');
+  }
+});
+
+// Feishu's public file page creates a short-lived anonymous session before it
+// can read the file bytes. Recreate that session on the server, then proxy the
+// original MP4 with Range support so the site can use its own video player.
+router.get('/:id/feishu-video', async (req, res) => {
+  try {
+    const work = db.getWorkById(req.params.id);
+    if (!work || work.type !== 'video') return res.status(404).send('Video not found');
+    const pageUrl = [work.external_url, work.source_url].find(isFeishuFileUrl);
+    const token = extractFeishuToken(pageUrl);
+    if (!pageUrl || !token) return res.status(400).send('Not a Feishu video');
+
+    const session = await fetchFeishuPage(pageUrl);
+    const upstream = await fetch(feishuOriginalVideoUrl(token), {
+      headers: buildFeishuStreamHeaders(session, {
+        accept: req.get('accept'),
+        range: req.get('range'),
+      }),
+      redirect: 'follow',
+    });
+    if (!upstream.ok && upstream.status !== 206) {
+      return res.status(upstream.status).send('Feishu video source unavailable');
+    }
+
+    res.status(upstream.status);
+    ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control', 'last-modified', 'etag'].forEach((name) => {
+      const value = upstream.headers.get(name);
+      if (value) res.setHeader(name, value);
+    });
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (!upstream.body) return res.end();
+
+    const upstreamStream = Readable.fromWeb(upstream.body);
+    upstreamStream.on('error', (err) => {
+      console.error('Feishu stream error:', err.message);
+      if (!res.headersSent) res.status(502).send('Feishu stream disconnected');
+      else res.destroy(err);
+    });
+    res.on('close', () => upstreamStream.destroy());
+    upstreamStream.pipe(res);
+  } catch (err) {
+    console.error('Feishu video proxy error:', err.message);
+    res.status(502).send('飞书视频流暂时无法读取');
   }
 });
 
