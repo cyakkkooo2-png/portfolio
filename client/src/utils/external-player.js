@@ -13,12 +13,15 @@ export function bilibiliPlayerSrc(work = {}) {
 }
 
 export function feishuPlayerSrc(work = {}) {
-  const url = sourceUrl(work);
-  try {
-    const parsed = new URL(url);
-    const isFeishu = /(^|\.)feishu\.cn$|(^|\.)larksuite\.com$/i.test(parsed.hostname);
-    return isFeishu && /^\/file\/[0-9A-Za-z_-]+/i.test(parsed.pathname) ? parsed.href : '';
-  } catch {
-    return '';
+  const candidates = [work.source_url, work.external_url, work.file_path];
+  for (const candidate of candidates) {
+    try {
+      const parsed = new URL(String(candidate || ''));
+      const isFeishu = /(^|\.)feishu\.cn$|(^|\.)larksuite\.com$/i.test(parsed.hostname);
+      if (isFeishu && /^\/file\/[0-9A-Za-z_-]+/i.test(parsed.pathname)) return parsed.href;
+    } catch {
+      // Try the next saved URL. Imported records may also contain a login redirect.
+    }
   }
+  return '';
 }

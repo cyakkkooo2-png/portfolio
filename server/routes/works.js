@@ -14,16 +14,7 @@ const { generateABogus } = require('../douyin-sign');
 const { TMP_DIR, UPLOADS_DIR, ensureDir, uploadPathFromUrl } = require('../paths');
 const { isPconlineVideoUrl, normalizePconlineVideoUrl } = require('../pconline-video');
 const { bilibiliFallbackTitle, extractBilibiliIds, isBilibiliUrl, shouldFetchBilibiliPage } = require('../bilibili-url');
-
-function isFeishuFileUrl(url = '') {
-  try {
-    const parsed = new URL(String(url));
-    return /(^|\.)feishu\.cn$|(^|\.)larksuite\.com$/i.test(parsed.hostname)
-      && /^\/file\/[0-9A-Za-z_-]+/i.test(parsed.pathname);
-  } catch {
-    return false;
-  }
-}
+const { extractFeishuTitle, isFeishuFileUrl } = require('../feishu-url');
 
 const router = express.Router();
 
@@ -541,6 +532,7 @@ async function extractFromUrl(inputUrl, options = {}) {
     : { html: '', finalUrl: pageUrl };
   const html = fetchedPage.html;
   const sourceUrl = fetchedPage.finalUrl || pageUrl;
+  const feishuTitle = isFeishu ? extractFeishuTitle(html) : '';
   const structuredArticle = findStructuredArticle(html);
   const isDouyin = isDouyinUrl(pageUrl) || isDouyinUrl(sourceUrl);
   const douyinMedia = isDouyin ? extractDouyinMedia(html) : null;
@@ -587,7 +579,7 @@ async function extractFromUrl(inputUrl, options = {}) {
     : '';
 
   return {
-    title: bilibiliMeta?.title || douyinDescription || title
+    title: feishuTitle || bilibiliMeta?.title || douyinDescription || title
       || (isFeishu ? '飞书视频' : isBilibili ? bilibiliFallbackTitle(inputUrl, html) : '抖音视频'),
     description: bilibiliMeta?.description || description,
     type: resolvedType,
@@ -600,7 +592,7 @@ async function extractFromUrl(inputUrl, options = {}) {
         ? Array.from(new Set(['B站', ...(bilibiliMeta?.tags || []), ...tags]))
         : (isDouyin ? Array.from(new Set(['抖音', ...tags])) : tags)),
     source_url: pageUrl,
-    external_url: sourceUrl,
+    external_url: isFeishu ? pageUrl : sourceUrl,
     ...(douyinMedia?.uri ? { douyin_video_uri: douyinMedia.uri } : {}),
     ...(douyinAspectRatio ? { video_aspect_ratio: douyinAspectRatio } : {}),
     // Keep imported articles fully inside this site. Structured data wins when a page provides it.

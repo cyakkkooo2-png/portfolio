@@ -18,6 +18,14 @@ test('keeps a public Feishu file page as the embedded player URL', () => {
   assert.equal(feishuPlayerSrc({ source_url: url }), url);
 });
 
+test('prefers the real Feishu file URL over a saved login redirect', () => {
+  const fileUrl = 'https://my.feishu.cn/file/UnHgbz9vzoDj7CxZF6Cci6S9n9g';
+  assert.equal(feishuPlayerSrc({
+    source_url: fileUrl,
+    external_url: 'https://accounts.feishu.cn/accounts/page/login?redirect_uri=example',
+  }), fileUrl);
+});
+
 test('does not embed an arbitrary Feishu page', () => {
   assert.equal(feishuPlayerSrc({ source_url: 'https://my.feishu.cn/drive/me/' }), '');
 });
