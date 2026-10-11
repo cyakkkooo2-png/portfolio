@@ -589,8 +589,8 @@ export default function WorksGrid({ onSelectWork }) {
               style={{
                 color: '#EDB79C',
                 background: 'linear-gradient(180deg, #0C567D, #084461)',
-                border: '1px solid rgba(237, 183, 156, 0.9)',
-                boxShadow: '0 12px 30px rgba(12, 86, 125, 0.3), inset 0 1px 0 rgba(237, 183, 156, 0.22)',
+                border: '1px solid #0C567D',
+                boxShadow: '0 12px 30px rgba(12, 86, 125, 0.34)',
                 writingMode: 'vertical-rl',
                 textOrientation: 'upright',
                 letterSpacing: '0.08em',
