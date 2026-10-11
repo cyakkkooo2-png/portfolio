@@ -6,6 +6,7 @@ import { VIDEO_CATEGORIES } from '../utils/video-categories';
 import { imageAspectRatio, splitImageWorksByOrientation } from '../utils/image-layout';
 import { externalVideoPreviewSrc, formatVideoDuration, videoMetadataSrc } from '../utils/external-video-preview';
 import { moveSelectedWorksToBottom } from '../utils/work-order';
+import { FALLBACK_LINK_TEXT, FEISHU_WORKS_HELP_URL } from '../utils/work-description';
 
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
@@ -578,7 +579,26 @@ export default function WorksGrid({ onSelectWork }) {
           </div>
         )}
 
-        <div className="mt-14">
+        <div className="relative mt-14">
+          <div className="pointer-events-none absolute -left-16 bottom-0 top-0 z-20 hidden md:block">
+            <a
+              href={FEISHU_WORKS_HELP_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="pointer-events-auto sticky top-28 inline-flex rounded-full px-2 py-3 text-[11px] font-semibold leading-4 no-underline transition duration-200 hover:-translate-y-0.5 hover:brightness-110"
+              style={{
+                color: '#f97316',
+                background: 'linear-gradient(180deg, rgba(255, 247, 237, 0.98), rgba(255, 237, 213, 0.96))',
+                border: '1px solid rgba(249, 115, 22, 0.34)',
+                boxShadow: '0 10px 28px rgba(249, 115, 22, 0.14)',
+                writingMode: 'vertical-rl',
+                textOrientation: 'upright',
+                letterSpacing: '0.08em',
+              }}
+            >
+              {FALLBACK_LINK_TEXT}
+            </a>
+          </div>
           {loading ? (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               {Array.from({ length: 3 }).map((_, index) => <div key={index} className="aspect-video rounded-2xl" style={{ background: '#101322' }} />)}

@@ -4,7 +4,7 @@ import { getWork } from '../api';
 import VideoPlayer from '../components/VideoPlayer';
 import ImageGallery from '../components/ImageGallery';
 import ArticleViewer from '../components/ArticleViewer';
-import WorkDescription from '../components/WorkDescription';
+import WorkDescription, { FallbackLinkBadge } from '../components/WorkDescription';
 
 const typeLabels = { video: '视频', image: '图片', article: '文章' };
 
@@ -68,12 +68,15 @@ export default function WorkDetail() {
 
         {/* Title & Meta */}
         <div className="mb-8">
-          <span className="text-xs px-2.5 py-1 rounded-full font-medium"
-            style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}>
-            {typeLabels[work.type]}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs px-2.5 py-1 rounded-full font-medium"
+              style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}>
+              {typeLabels[work.type]}
+            </span>
+            <FallbackLinkBadge work={work} />
+          </div>
           <h1 className="text-3xl font-bold text-white mt-3 mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>{work.title}</h1>
-          <WorkDescription work={work} className="text-gray-400 leading-relaxed" />
+          <WorkDescription work={work} showFallbackLink={false} className="text-gray-400 leading-relaxed" />
           <p className="text-xs text-gray-600 mt-3">
             发布于 {new Date(work.created_at).toLocaleDateString('zh-CN')}
           </p>

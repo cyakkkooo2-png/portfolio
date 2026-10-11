@@ -6,7 +6,7 @@ import {
 } from '../utils/douyin-player';
 import { bilibiliPlayerSrc } from '../utils/external-player';
 import { isFeishuWork } from '../utils/external-video-preview';
-import WorkDescription from './WorkDescription';
+import WorkDescription, { FallbackLinkBadge } from './WorkDescription';
 
 const labels = { video: '视频', image: '图片', article: '文章' };
 
@@ -254,15 +254,18 @@ export default function WorkDetailModal({ work, onClose }) {
           }}
         >
           <div className="mb-4 flex min-h-10 items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium" style={{ background: `${acc}15`, color: acc, border: `1px solid ${acc}25` }}>
-              <TypeIcon type={work.type} />
-              {labels[work.type]}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium" style={{ background: `${acc}15`, color: acc, border: `1px solid ${acc}25` }}>
+                <TypeIcon type={work.type} />
+                {labels[work.type]}
+              </span>
+              <FallbackLinkBadge work={work} />
+            </div>
           </div>
           <h2 className="mb-3 text-2xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
             {work.title}
           </h2>
-          <WorkDescription work={work} className="mb-5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }} />
+          <WorkDescription work={work} showFallbackLink={false} className="mb-5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.8 }} />
 
           {work.type === 'article' && work.content && (
             <div className="mt-4 space-y-4 pt-5 leading-relaxed" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.62)', lineHeight: 1.9 }}>
