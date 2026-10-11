@@ -587,10 +587,10 @@ export default function WorksGrid({ onSelectWork }) {
               rel="noreferrer"
               className="pointer-events-auto sticky top-28 inline-flex rounded-full px-3 py-4 text-sm font-bold leading-5 no-underline backdrop-blur-sm transition duration-200 hover:-translate-y-0.5 hover:brightness-125"
               style={{
-                color: '#fff',
-                background: 'linear-gradient(180deg, #ff7a1a, #ff5f00)',
-                border: '1px solid rgba(255, 94, 0, 0.88)',
-                boxShadow: '0 12px 30px rgba(255, 102, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.24)',
+                color: '#EDB79C',
+                background: 'linear-gradient(180deg, #0C567D, #084461)',
+                border: '1px solid rgba(237, 183, 156, 0.9)',
+                boxShadow: '0 12px 30px rgba(12, 86, 125, 0.3), inset 0 1px 0 rgba(237, 183, 156, 0.22)',
                 writingMode: 'vertical-rl',
                 textOrientation: 'upright',
                 letterSpacing: '0.08em',

@@ -7,6 +7,16 @@ export function safeFeishuFallbackUrl(work = {}) {
   return /^https:\/\/[a-z0-9-]+\.feishu\.cn\/file\/[A-Za-z0-9_-]+(?:[?#].*)?$/i.test(url) ? url : '';
 }
 
+export function safeVideoFallbackUrl(work = {}) {
+  if (work.type !== 'video') return '';
+
+  const explicitFallback = safeFeishuFallbackUrl(work);
+  if (explicitFallback) return explicitFallback;
+
+  const originalUrl = String(work.external_url || work.source_url || '').trim();
+  return /^https?:\/\/[^\s]+$/i.test(originalUrl) ? originalUrl : '';
+}
+
 export function safeArticleOriginalUrl(work = {}) {
   if (work.type !== 'article') return '';
   const url = String(work.external_url || work.source_url || '').trim();

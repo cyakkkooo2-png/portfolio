@@ -2,7 +2,7 @@ import {
   ARTICLE_FALLBACK_LINK_TEXT,
   FALLBACK_LINK_TEXT,
   safeArticleOriginalUrl,
-  safeFeishuFallbackUrl,
+  safeVideoFallbackUrl,
 } from '../utils/work-description';
 
 function CompactFallbackBadge({ href, children, className = '', style }) {
@@ -28,7 +28,7 @@ function CompactFallbackBadge({ href, children, className = '', style }) {
 }
 
 export function FallbackLinkBadge({ work, className = '', style }) {
-  const fallbackUrl = safeFeishuFallbackUrl(work);
+  const fallbackUrl = safeVideoFallbackUrl(work);
   return (
     <CompactFallbackBadge href={fallbackUrl} className={className} style={style}>
       {FALLBACK_LINK_TEXT}
@@ -49,7 +49,7 @@ export default function WorkDescription({ work, className = '', style, showFallb
   const description = String(work?.description || '');
   if (!description) return null;
 
-  const fallbackUrl = safeFeishuFallbackUrl(work);
+  const fallbackUrl = safeVideoFallbackUrl(work);
   const markerIndex = fallbackUrl ? description.indexOf(FALLBACK_LINK_TEXT) : -1;
   if (markerIndex < 0) {
     return <p className={className} style={{ whiteSpace: 'pre-line', ...style }}>{description}</p>;
