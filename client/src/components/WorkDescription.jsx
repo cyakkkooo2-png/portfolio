@@ -13,7 +13,7 @@ function CompactFallbackBadge({ href, children, className = '', style }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold leading-5 no-underline transition duration-200 hover:-translate-y-px hover:brightness-125 ${className}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold leading-5 no-underline transition duration-200 hover:-translate-y-px hover:brightness-125 ${className}`}
       style={{
         color: '#ff9a52',
         background: 'linear-gradient(135deg, rgba(255, 122, 26, 0.16), rgba(255, 122, 26, 0.07))',

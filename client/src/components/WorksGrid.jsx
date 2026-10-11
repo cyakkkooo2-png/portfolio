@@ -585,7 +585,7 @@ export default function WorksGrid({ onSelectWork }) {
               href={FEISHU_WORKS_HELP_URL}
               target="_blank"
               rel="noreferrer"
-              className="pointer-events-auto sticky top-28 inline-flex rounded-full px-2.5 py-3.5 text-xs font-bold leading-4 no-underline backdrop-blur-sm transition duration-200 hover:-translate-y-0.5 hover:brightness-125"
+              className="pointer-events-auto sticky top-28 inline-flex rounded-full px-3 py-4 text-sm font-bold leading-5 no-underline backdrop-blur-sm transition duration-200 hover:-translate-y-0.5 hover:brightness-125"
               style={{
                 color: '#ff8a32',
                 background: 'linear-gradient(180deg, rgba(40, 24, 17, 0.98), rgba(25, 18, 20, 0.98))',
