@@ -67,6 +67,7 @@ export function getAnalyticsWorks(query = '') { return request(`/analytics/works
 export function getAnalyticsWork(id, query = '') { return request(`/analytics/works/${id}${query}`); }
 export function getAnalyticsVisitors(query = '') { return request(`/analytics/visitors${query}`); }
 export function getAnalyticsVisitor(id, query = '') { return request(`/analytics/visitors/${id}${query}`); }
+export function deleteAnalyticsVisitor(id) { return request(`/analytics/visitors/${id}`, { method: 'DELETE' }); }
 export function getAnalyticsGeo(query = '') { return request(`/analytics/geo${query}`); }
 
 export function deleteWork(id) {

@@ -69,6 +69,11 @@ router.get('/works', (req, res) => res.json({ works: store.works(req.query) }));
 router.get('/works/:id', (req, res) => res.json(store.workDetail(req.params.id, req.query)));
 router.get('/visitors', (req, res) => res.json({ visitors: store.visitors(req.query) }));
 router.get('/visitors/:id', (req, res) => res.json(store.visitorDetail(req.params.id, req.query)));
+router.delete('/visitors/:id', (req, res) => {
+  const result = store.deleteVisitor(req.params.id);
+  if (!result) return res.status(404).json({ error: '访客不存在或已被删除' });
+  res.json(result);
+});
 router.get('/geo', (req, res) => res.json(store.geo(req.query)));
 router.get('/export', (req, res) => {
   const rows = store.works(req.query);

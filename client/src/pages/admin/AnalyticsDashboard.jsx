@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  getAnalyticsGeo, getAnalyticsOverview, getAnalyticsTrends, getAnalyticsVisitor,
+  deleteAnalyticsVisitor, getAnalyticsGeo, getAnalyticsOverview, getAnalyticsTrends, getAnalyticsVisitor,
   getAnalyticsVisitors, getAnalyticsWork, getAnalyticsWorks, getWorks,
 } from '../../api';
 
@@ -77,6 +77,8 @@ export default function AnalyticsDashboard() {
   const [selectedWork, setSelectedWork] = useState(null);
   const [workDetail, setWorkDetail] = useState(null);
   const [visitorDetail, setVisitorDetail] = useState(null);
+  const [deletingVisitor, setDeletingVisitor] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const query = useMemo(() => `?start=${start}&end=${end}&include_internal=${includeInternal}`, [start, end, includeInternal]);
 
@@ -87,10 +89,25 @@ export default function AnalyticsDashboard() {
         setOverview(o); setTrends(t.trends || []); setWorkRows(w.works || []); setVisitors(v.visitors || []); setLocations(g.locations || []); setSources(g.sources || []); setDevices(g.devices || []);
         setWorkNames(Object.fromEntries((allWorks.works || []).map((work) => [work.id, work.title])));
       }).finally(() => setLoading(false));
-  }, [query]);
+  }, [query, refreshKey]);
 
   async function openWork(row) { setSelectedWork(row); setWorkDetail(await getAnalyticsWork(row.work_id, query)); }
   async function openVisitor(visitor) { setVisitorDetail(await getAnalyticsVisitor(visitor.visitor_id, query)); }
+  async function removeVisitor() {
+    if (!visitorDetail || deletingVisitor) return;
+    const shortId = visitorDetail.visitor_id.slice(0, 12);
+    if (!window.confirm(`确定永久删除匿名访客 ${shortId}？\n\n该访客的全部会话、操作轨迹和视频观看记录都会一起删除，且无法恢复。`)) return;
+    setDeletingVisitor(true);
+    try {
+      await deleteAnalyticsVisitor(visitorDetail.visitor_id);
+      setVisitorDetail(null);
+      setRefreshKey((value) => value + 1);
+    } catch (error) {
+      window.alert(error.message || '删除失败，请稍后重试');
+    } finally {
+      setDeletingVisitor(false);
+    }
+  }
   async function exportCsv() {
     const response = await fetch(`/api/analytics/export${query}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
     if (!response.ok) return;
@@ -120,7 +137,7 @@ export default function AnalyticsDashboard() {
         </div><div><h2 className="mb-3 font-bold">访问趋势</h2><Bars rows={trends} /></div><div><h2 className="mb-3 font-bold">热门作品</h2><WorkTable rows={workRows.slice(0, 8)} names={workNames} onSelect={openWork} /></div></div>}
         {tab === 'works' && <><WorkTable rows={workRows} names={workNames} onSelect={openWork} />{selectedWork && <div className="mt-5 rounded-xl bg-blue-50 p-4 text-sm text-blue-700">正在查看：{workNames[selectedWork.work_id] || selectedWork.work_id}</div>}<Retention detail={workDetail} /></>}
         {tab === 'visitors' && <div className="grid gap-5 lg:grid-cols-[380px_1fr]"><div className="space-y-2">{visitors.map((visitor) => <button key={visitor.visitor_id} onClick={() => openVisitor(visitor)} className="w-full rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm hover:border-blue-200"><p className="font-mono text-xs font-bold text-slate-700">{visitor.visitor_id.slice(0, 12)}</p><p className="mt-2 text-xs text-slate-400">{visitor.city || '未知地区'}{visitor.district ? ` · ${visitor.district}` : ''} · {visitor.device_type}</p><p className="mt-1 text-xs text-slate-400">{visitor.session_count} 次会话 · 活跃 {seconds(visitor.active_seconds)}</p></button>)}</div>
-          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">{visitorDetail ? <><h3 className="font-bold">匿名访客 {visitorDetail.visitor_id.slice(0, 12)}</h3><div className="mt-5 space-y-4">{visitorDetail.events.map((event) => <div key={event.event_id} className="border-l-2 border-blue-200 pl-4"><p className="text-sm font-semibold text-slate-700">{EVENT_LABELS[event.event_type] || event.event_type}{event.work_id ? ` · ${workNames[event.work_id] || event.work_id}` : ''}</p><p className="mt-1 text-xs text-slate-400">{new Date(event.occurred_at).toLocaleString('zh-CN')}{event.position_seconds != null ? ` · ${seconds(event.position_seconds)}` : ''}{event.target_platform ? ` · ${event.target_platform}` : ''}</p></div>)}</div></> : <p className="py-20 text-center text-sm text-slate-400">选择一位访客查看完整操作轨迹</p>}</div></div>}
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">{visitorDetail ? <><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">匿名访客 {visitorDetail.visitor_id.slice(0, 12)}</h3><button type="button" onClick={removeVisitor} disabled={deletingVisitor} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">{deletingVisitor ? '正在删除…' : '删除访客'}</button></div><p className="mt-2 text-xs text-slate-400">删除后，该访客的全部访问与观看记录将永久清除。</p><div className="mt-5 space-y-4">{visitorDetail.events.map((event) => <div key={event.event_id} className="border-l-2 border-blue-200 pl-4"><p className="text-sm font-semibold text-slate-700">{EVENT_LABELS[event.event_type] || event.event_type}{event.work_id ? ` · ${workNames[event.work_id] || event.work_id}` : ''}</p><p className="mt-1 text-xs text-slate-400">{new Date(event.occurred_at).toLocaleString('zh-CN')}{event.position_seconds != null ? ` · ${seconds(event.position_seconds)}` : ''}{event.target_platform ? ` · ${event.target_platform}` : ''}</p></div>)}</div></> : <p className="py-20 text-center text-sm text-slate-400">选择一位访客查看完整操作轨迹</p>}</div></div>}
         {tab === 'geo' && <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"><h2 className="mb-5 font-bold">城市 / 区县</h2><div className="space-y-4">{locations.map((place) => <div key={`${place.city}-${place.district}`}><div className="mb-1 flex justify-between text-sm"><span className="font-semibold">{place.city}{place.district ? ` · ${place.district}` : ''}</span><span className="text-slate-400">{place.visitors} 人 · 平均 {seconds(place.avg_active_seconds)}</span></div><div className="h-2 overflow-hidden rounded bg-slate-100"><div className="h-full rounded bg-blue-500" style={{ width: `${Math.max(3, place.visitors / Math.max(1, locations[0]?.visitors) * 100)}%` }} /></div></div>)}</div></div><div className="space-y-5"><div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"><h2 className="mb-4 font-bold">访问来源</h2>{sources.map((source) => <div key={source.source} className="flex justify-between border-b border-slate-50 py-2 text-sm"><span>{source.source}</span><b>{source.sessions}</b></div>)}</div><div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"><h2 className="mb-4 font-bold">设备</h2>{devices.map((device) => <div key={device.device} className="flex justify-between border-b border-slate-50 py-2 text-sm"><span>{device.device === 'mobile' ? '手机 / 平板' : device.device === 'desktop' ? '电脑' : '其他'}</span><b>{device.sessions}</b></div>)}</div></div></div>}
       </>}
     </main>

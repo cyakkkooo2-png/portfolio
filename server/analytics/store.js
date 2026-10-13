@@ -273,6 +273,19 @@ class AnalyticsStore {
     return { visitor_id: visitorId, sessions, events };
   }
 
+  deleteVisitor(visitorId) {
+    const visitor = this.db.prepare('SELECT visitor_id FROM analytics_visitors WHERE visitor_id=?').get(visitorId);
+    if (!visitor) return null;
+
+    return this.db.transaction(() => {
+      const events = this.db.prepare('DELETE FROM analytics_events WHERE visitor_id=?').run(visitorId).changes;
+      const videos = this.db.prepare('DELETE FROM analytics_video_sessions WHERE visitor_id=?').run(visitorId).changes;
+      const sessions = this.db.prepare('DELETE FROM analytics_sessions WHERE visitor_id=?').run(visitorId).changes;
+      this.db.prepare('DELETE FROM analytics_visitors WHERE visitor_id=?').run(visitorId);
+      return { visitor_id: visitorId, deleted: { events, videos, sessions } };
+    })();
+  }
+
   geo(query = {}) {
     const f = this.filters(query);
     const internalClause = f.internal ? '' : 'AND is_internal = 0';

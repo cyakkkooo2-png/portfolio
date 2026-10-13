@@ -38,6 +38,20 @@ test('public collection writes data that only an authenticated admin can read', 
     const overviewResponse = await fetch(`${base}/api/analytics/overview`, { headers: { authorization: `Bearer ${token}` } });
     assert.equal(overviewResponse.status, 200);
     assert.equal((await overviewResponse.json()).metrics.work_opens, 1);
+
+    assert.equal((await fetch(`${base}/api/analytics/visitors/${session.session_id}`, { method: 'DELETE' })).status, 401);
+    const visitorsResponse = await fetch(`${base}/api/analytics/visitors`, { headers: { authorization: `Bearer ${token}` } });
+    const visitorId = (await visitorsResponse.json()).visitors[0].visitor_id;
+    const deleteResponse = await fetch(`${base}/api/analytics/visitors/${visitorId}`, {
+      method: 'DELETE', headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(deleteResponse.status, 200);
+    assert.equal((await deleteResponse.json()).deleted.events, 1);
+    const emptyVisitors = await fetch(`${base}/api/analytics/visitors`, { headers: { authorization: `Bearer ${token}` } });
+    assert.equal((await emptyVisitors.json()).visitors.length, 0);
+    assert.equal((await fetch(`${base}/api/analytics/visitors/${visitorId}`, {
+      method: 'DELETE', headers: { authorization: `Bearer ${token}` },
+    })).status, 404);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
