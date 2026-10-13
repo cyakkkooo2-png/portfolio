@@ -2,7 +2,7 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const { v4: uuidv4 } = require('uuid');
 const { DATA_DIR, ensureDir } = require('../paths');
-const { isComplete, normalizeEvent } = require('./metrics');
+const { cleanVisitorTimeline, isComplete, normalizeEvent } = require('./metrics');
 
 const EVENT_TYPES = new Set([
   'page_view', 'work_impression', 'work_open', 'video_start', 'video_pause',
@@ -257,7 +257,7 @@ class AnalyticsStore {
     const internalClause = f.internal ? '' : 'AND s.is_internal = 0';
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 30));
     const offset = Math.max(0, Number(query.offset) || 0);
-    return this.db.prepare(`SELECT s.visitor_id, MIN(s.started_at) first_seen_at, MAX(s.last_seen_at) last_seen_at,
+    return this.db.prepare(`SELECT s.visitor_id, MIN(s.started_at) first_seen_at, MAX(s.started_at) last_entered_at, MAX(s.last_seen_at) last_seen_at,
       MAX(s.city) city, MAX(s.district) district, MAX(s.device_type) device_type,
       COUNT(*) session_count, SUM(s.active_seconds) active_seconds
       FROM analytics_sessions s WHERE s.started_at BETWEEN ? AND ? ${internalClause}
@@ -268,7 +268,7 @@ class AnalyticsStore {
     const f = this.filters(query);
     const internalClause = f.internal ? '' : 'AND is_internal=0';
     const sessions = this.db.prepare(`SELECT * FROM analytics_sessions WHERE visitor_id=? AND started_at BETWEEN ? AND ? ${internalClause} ORDER BY started_at DESC`).all(visitorId, f.start, f.end);
-    const events = this.db.prepare(`SELECT * FROM analytics_events WHERE visitor_id=? AND occurred_at BETWEEN ? AND ? ${internalClause} ORDER BY occurred_at`).all(visitorId, f.start, f.end)
+    const events = cleanVisitorTimeline(this.db.prepare(`SELECT * FROM analytics_events WHERE visitor_id=? AND occurred_at BETWEEN ? AND ? ${internalClause} ORDER BY occurred_at`).all(visitorId, f.start, f.end))
       .map((event) => ({ ...event, metadata: JSON.parse(event.metadata_json || '{}') }));
     return { visitor_id: visitorId, sessions, events };
   }

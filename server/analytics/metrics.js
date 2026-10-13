@@ -42,4 +42,27 @@ function normalizeEvent(raw = {}) {
   };
 }
 
-module.exports = { COMPLETION_RATIO, clampNumber, isComplete, normalizeEvent };
+function eventDetailScore(event) {
+  return ['position_seconds', 'duration_seconds', 'max_position_seconds', 'watched_seconds', 'metadata_json']
+    .reduce((score, key) => score + (event[key] != null && event[key] !== '' ? 1 : 0), 0);
+}
+
+function cleanVisitorTimeline(events = []) {
+  const unique = new Map();
+  for (const event of events) {
+    const second = String(event.occurred_at || '').slice(0, 19);
+    const key = `${event.event_type || ''}|${event.work_id || ''}|${second}`;
+    const existing = unique.get(key);
+    if (!existing || eventDetailScore(event) >= eventDetailScore(existing)) unique.set(key, event);
+  }
+
+  let activeWork = null;
+  return [...unique.values()].filter((event) => {
+    if (event.event_type === 'work_open') activeWork = event.work_id || null;
+    if (event.event_type === 'work_impression' && activeWork && event.work_id !== activeWork) return false;
+    if (event.event_type === 'work_close' && event.work_id === activeWork) activeWork = null;
+    return true;
+  });
+}
+
+module.exports = { COMPLETION_RATIO, clampNumber, cleanVisitorTimeline, isComplete, normalizeEvent };

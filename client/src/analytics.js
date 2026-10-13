@@ -1,3 +1,5 @@
+import { createPageExitGate } from './utils/analytics-policy';
+
 const QUEUE_KEY = 'ccy_analytics_queue_v1';
 let sessionId = '';
 let initPromise = null;
@@ -76,6 +78,7 @@ export function createWatchId() { return id(); }
 
 export function startAnalyticsLifecycle() {
   initAnalytics();
+  const exitGate = createPageExitGate();
   let activeSeconds = 0;
   let lastInteraction = Date.now();
   const activity = () => { lastInteraction = Date.now(); };
@@ -84,16 +87,23 @@ export function startAnalyticsLifecycle() {
   }, 1000);
   ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach((name) => window.addEventListener(name, activity, { passive: true }));
   const flush = () => {
+    if (!exitGate.leave()) return;
     track('session_end', { active_seconds: activeSeconds, metadata: { reason: 'pagehide' } });
     flushAnalytics({ beacon: true });
   };
-  const hidden = () => { if (document.visibilityState === 'hidden') flush(); };
+  const hidden = () => {
+    if (document.visibilityState === 'hidden') flush();
+    else exitGate.resume();
+  };
+  const resume = () => exitGate.resume();
   window.addEventListener('pagehide', flush);
+  window.addEventListener('pageshow', resume);
   document.addEventListener('visibilitychange', hidden);
   return () => {
     clearInterval(interval);
     ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach((name) => window.removeEventListener(name, activity));
     window.removeEventListener('pagehide', flush);
+    window.removeEventListener('pageshow', resume);
     document.removeEventListener('visibilitychange', hidden);
   };
 }

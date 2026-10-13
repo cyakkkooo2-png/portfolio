@@ -41,7 +41,10 @@ test('public collection writes data that only an authenticated admin can read', 
 
     assert.equal((await fetch(`${base}/api/analytics/visitors/${session.session_id}`, { method: 'DELETE' })).status, 401);
     const visitorsResponse = await fetch(`${base}/api/analytics/visitors`, { headers: { authorization: `Bearer ${token}` } });
-    const visitorId = (await visitorsResponse.json()).visitors[0].visitor_id;
+    const visitor = (await visitorsResponse.json()).visitors[0];
+    assert.ok(visitor.last_entered_at);
+    assert.equal(visitor.last_entered_at, visitor.first_seen_at);
+    const visitorId = visitor.visitor_id;
     const deleteResponse = await fetch(`${base}/api/analytics/visitors/${visitorId}`, {
       method: 'DELETE', headers: { authorization: `Bearer ${token}` },
     });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import VideoPlayer from './VideoPlayer';
 import { track } from '../analytics';
+import { shouldTrackModalClose } from '../utils/analytics-policy';
 import {
   douyinStageStyle,
   resolveDouyinPlayerSize,
@@ -122,7 +123,9 @@ export default function WorkDetailModal({ work, onClose }) {
   if (!work) return null;
 
   function closeModal() {
-    track('work_close', { work_id: work.id, metadata: { reason: 'modal_close' } });
+    if (shouldTrackModalClose(work.type)) {
+      track('work_close', { work_id: work.id, metadata: { reason: 'modal_close' } });
+    }
     onClose();
   }
 

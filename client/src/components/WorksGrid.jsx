@@ -8,6 +8,7 @@ import { externalVideoPreviewSrc, formatVideoDuration, videoMetadataSrc } from '
 import { moveSelectedWorksToBottom } from '../utils/work-order';
 import { FALLBACK_LINK_TEXT, FEISHU_WORKS_HELP_URL } from '../utils/work-description';
 import { track } from '../analytics';
+import { shouldTrackBackgroundImpression } from '../utils/analytics-policy';
 
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
@@ -135,7 +136,7 @@ function moveItem(list, from, to) {
   return next;
 }
 
-export default function WorksGrid({ onSelectWork }) {
+export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
   const t = useTheme();
   const { user } = useAuth() || {};
   const [works, setWorks] = useState([]);
@@ -223,6 +224,7 @@ export default function WorksGrid({ onSelectWork }) {
   }, [filter, measuredImageRatios, visibleWorks]);
 
   useEffect(() => {
+    if (hasOpenWork) return undefined;
     const seen = new Set();
     const timers = new Map();
     const observer = new IntersectionObserver((entries) => {
@@ -231,6 +233,7 @@ export default function WorksGrid({ onSelectWork }) {
         if (!workId || seen.has(workId)) return;
         if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
           const timer = setTimeout(() => {
+            if (!shouldTrackBackgroundImpression({ hasOpenWork, visibilityState: document.visibilityState })) return;
             seen.add(workId);
             track('work_impression', { work_id: workId, metadata: { visible_ratio: entry.intersectionRatio } });
           }, 1000);
@@ -243,7 +246,7 @@ export default function WorksGrid({ onSelectWork }) {
     }, { threshold: [0.5] });
     document.querySelectorAll('[data-work-card]').forEach((element) => observer.observe(element));
     return () => { observer.disconnect(); timers.forEach(clearTimeout); };
-  }, [displayWorks]);
+  }, [displayWorks, hasOpenWork]);
 
   const visibleWorkIds = useMemo(() => visibleWorks.map((work) => work.id), [visibleWorks]);
   const selectedVisibleCount = useMemo(

@@ -29,7 +29,7 @@ export default function Home() {
   return (
     <div>
       <Hero />
-      <WorksGrid onSelectWork={setSelectedWork} />
+      <WorksGrid onSelectWork={setSelectedWork} hasOpenWork={Boolean(selectedWork)} />
       <About />
       <Contact />
       <Footer />

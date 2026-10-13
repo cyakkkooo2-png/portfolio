@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 
+const geoCache = new Map();
+
 function parseCookies(header = '') {
   return header.split(';').reduce((cookies, pair) => {
     const index = pair.indexOf('=');
@@ -44,23 +46,44 @@ async function resolveGeo(req) {
   };
   if (fromHeaders.city) return fromHeaders;
 
-  const key = process.env.AMAP_IP_KEY;
   const ip = clientIp(req).replace(/^::ffff:/, '');
-  if (!key || !ip || ip === '127.0.0.1' || ip === '::1') return {};
+  if (!ip || ip === '127.0.0.1' || ip === '::1') return {};
+  const cacheKey = hashNetwork(ip);
+  if (geoCache.has(cacheKey)) return geoCache.get(cacheKey);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1800);
+  let geo = {};
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 1800);
-    const response = await fetch(`https://restapi.amap.com/v3/ip?key=${encodeURIComponent(key)}&ip=${encodeURIComponent(ip)}`, { signal: controller.signal });
-    clearTimeout(timer);
-    const data = await response.json();
-    if (data.status !== '1') return {};
-    return {
-      province: Array.isArray(data.province) ? '' : String(data.province || '').slice(0, 40),
-      city: Array.isArray(data.city) ? '' : String(data.city || '').slice(0, 40),
-      district: '',
-      adcode: String(data.adcode || '').slice(0, 20),
-    };
-  } catch { return {}; }
+    const key = process.env.AMAP_IP_KEY;
+    if (key) {
+      const response = await fetch(`https://restapi.amap.com/v3/ip?key=${encodeURIComponent(key)}&ip=${encodeURIComponent(ip)}`, { signal: controller.signal });
+      const data = await response.json();
+      if (data.status === '1') {
+        geo = {
+          province: Array.isArray(data.province) ? '' : String(data.province || '').slice(0, 40),
+          city: Array.isArray(data.city) ? '' : String(data.city || '').slice(0, 40),
+          district: '',
+          adcode: String(data.adcode || '').slice(0, 20),
+        };
+      }
+    }
+    if (!geo.city) {
+      const response = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}?fields=success,region,city`, { signal: controller.signal });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        geo = {
+          province: String(data.region || '').slice(0, 40),
+          city: String(data.city || '').slice(0, 40),
+          district: '',
+          adcode: '',
+        };
+      }
+    }
+  } catch { geo = {}; }
+  finally { clearTimeout(timer); }
+  if (geo.city) geoCache.set(cacheKey, geo);
+  return geo;
 }
 
 module.exports = { parseCookies, clientIp, hashNetwork, userAgentInfo, referrerHost, resolveGeo };
