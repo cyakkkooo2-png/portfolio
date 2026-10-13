@@ -7,7 +7,7 @@ const { cleanVisitorTimeline, isComplete, normalizeEvent } = require('./metrics'
 const EVENT_TYPES = new Set([
   'page_view', 'work_impression', 'work_open', 'video_start', 'video_pause',
   'video_resume', 'video_seek', 'video_heartbeat', 'video_complete', 'work_close',
-  'external_jump', 'session_end',
+  'external_jump', 'external_return', 'session_end',
 ]);
 
 function dateOnly(value) {
@@ -96,6 +96,10 @@ class AnalyticsStore {
       CREATE UNIQUE INDEX IF NOT EXISTS uniq_impression_session_work
         ON analytics_events(session_id, work_id, event_type) WHERE event_type='work_impression';
     `);
+    const visitorColumns = this.db.prepare('PRAGMA table_info(analytics_visitors)').all();
+    if (!visitorColumns.some((column) => column.name === 'note')) {
+      this.db.exec('ALTER TABLE analytics_visitors ADD COLUMN note TEXT');
+    }
   }
 
   startSession({ visitorId, sessionId, now = new Date().toISOString(), geo = {}, request = {}, isInternal = false, isBot = false }) {
@@ -185,6 +189,21 @@ class AnalyticsStore {
     return { accepted };
   }
 
+  updateSessionLocation(sessionId, location = {}) {
+    const session = this.db.prepare('SELECT visitor_id FROM analytics_sessions WHERE session_id=?').get(sessionId);
+    if (!session) return null;
+    const city = String(location.city || '').trim().slice(0, 40);
+    const district = String(location.district || '').trim().slice(0, 40);
+    if (!city || !district) return null;
+    this.db.prepare('UPDATE analytics_sessions SET city=?, district=? WHERE session_id=?')
+      .run(city, district, sessionId);
+    this.db.prepare(`UPDATE analytics_visitors SET
+      first_city=CASE WHEN first_city IS NULL OR first_city='' THEN ? ELSE first_city END,
+      first_district=CASE WHEN first_district IS NULL OR first_district='' THEN ? ELSE first_district END
+      WHERE visitor_id=?`).run(city, district, session.visitor_id);
+    return { city, district };
+  }
+
   filters(query = {}) {
     const end = query.end ? new Date(`${query.end}T23:59:59.999+08:00`).toISOString() : new Date().toISOString();
     const start = query.start ? new Date(`${query.start}T00:00:00.000+08:00`).toISOString() : new Date(Date.now() - 29 * 86400000).toISOString();
@@ -257,10 +276,11 @@ class AnalyticsStore {
     const internalClause = f.internal ? '' : 'AND s.is_internal = 0';
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 30));
     const offset = Math.max(0, Number(query.offset) || 0);
-    return this.db.prepare(`SELECT s.visitor_id, MIN(s.started_at) first_seen_at, MAX(s.started_at) last_entered_at, MAX(s.last_seen_at) last_seen_at,
+    return this.db.prepare(`SELECT s.visitor_id, MAX(v.note) note, MIN(s.started_at) first_seen_at, MAX(s.started_at) last_entered_at, MAX(s.last_seen_at) last_seen_at,
       MAX(s.city) city, MAX(s.district) district, MAX(s.device_type) device_type,
       COUNT(*) session_count, SUM(s.active_seconds) active_seconds
-      FROM analytics_sessions s WHERE s.started_at BETWEEN ? AND ? ${internalClause}
+      FROM analytics_sessions s JOIN analytics_visitors v ON v.visitor_id=s.visitor_id
+      WHERE s.started_at BETWEEN ? AND ? ${internalClause}
       GROUP BY s.visitor_id ORDER BY last_seen_at DESC LIMIT ? OFFSET ?`).all(f.start, f.end, limit, offset);
   }
 
@@ -270,7 +290,14 @@ class AnalyticsStore {
     const sessions = this.db.prepare(`SELECT * FROM analytics_sessions WHERE visitor_id=? AND started_at BETWEEN ? AND ? ${internalClause} ORDER BY started_at DESC`).all(visitorId, f.start, f.end);
     const events = cleanVisitorTimeline(this.db.prepare(`SELECT * FROM analytics_events WHERE visitor_id=? AND occurred_at BETWEEN ? AND ? ${internalClause} ORDER BY occurred_at`).all(visitorId, f.start, f.end))
       .map((event) => ({ ...event, metadata: JSON.parse(event.metadata_json || '{}') }));
-    return { visitor_id: visitorId, sessions, events };
+    const visitor = this.db.prepare('SELECT note FROM analytics_visitors WHERE visitor_id=?').get(visitorId);
+    return { visitor_id: visitorId, note: visitor?.note || '', sessions, events };
+  }
+
+  updateVisitorNote(visitorId, value) {
+    const note = String(value || '').trim().slice(0, 30);
+    const result = this.db.prepare('UPDATE analytics_visitors SET note=? WHERE visitor_id=?').run(note || null, visitorId);
+    return result.changes ? { visitor_id: visitorId, note } : null;
   }
 
   deleteVisitor(visitorId) {

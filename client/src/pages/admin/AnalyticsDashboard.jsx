@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   deleteAnalyticsVisitor, getAnalyticsGeo, getAnalyticsOverview, getAnalyticsTrends, getAnalyticsVisitor,
-  getAnalyticsVisitors, getAnalyticsWork, getAnalyticsWorks, getWorks,
+  getAnalyticsVisitors, getAnalyticsWork, getAnalyticsWorks, getWorks, updateAnalyticsVisitorNote,
 } from '../../api';
+import { normalizeVisitorNote } from '../../utils/visitor-note';
 
 const TABS = [
   ['overview', '数据总览'], ['works', '作品分析'], ['visitors', '访客轨迹'], ['geo', '地域与来源'],
@@ -67,7 +68,7 @@ function Retention({ detail }) {
   </div>;
 }
 
-const EVENT_LABELS = { page_view: '进入网站', work_impression: '看到作品', work_open: '打开作品', video_start: '开始播放', video_pause: '暂停', video_resume: '继续播放', video_seek: '拖动进度', video_heartbeat: '持续观看', video_complete: '播放完成', work_close: '退出作品', external_jump: '跳转外部平台', session_end: '离开网站' };
+const EVENT_LABELS = { page_view: '进入网站', work_impression: '看到作品', work_open: '打开作品', video_start: '开始播放', video_pause: '暂停', video_resume: '继续播放', video_seek: '拖动进度', video_heartbeat: '持续观看', video_complete: '播放完成', work_close: '退出作品', external_jump: '跳转外部平台', external_return: '从外部平台返回', session_end: '离开网站' };
 
 export default function AnalyticsDashboard() {
   const [tab, setTab] = useState('overview');
@@ -87,7 +88,10 @@ export default function AnalyticsDashboard() {
   const [workDetail, setWorkDetail] = useState(null);
   const [visitorDetail, setVisitorDetail] = useState(null);
   const [deletingVisitor, setDeletingVisitor] = useState(false);
+  const [editingVisitorId, setEditingVisitorId] = useState('');
+  const [noteDraft, setNoteDraft] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const cancelNoteRef = useRef(false);
 
   const query = useMemo(() => `?start=${start}&end=${end}&include_internal=${includeInternal}`, [start, end, includeInternal]);
 
@@ -102,6 +106,27 @@ export default function AnalyticsDashboard() {
 
   async function openWork(row) { setSelectedWork(row); setWorkDetail(await getAnalyticsWork(row.work_id, query)); }
   async function openVisitor(visitor) { setVisitorDetail(await getAnalyticsVisitor(visitor.visitor_id, query)); }
+  function beginVisitorNote(event, visitor) {
+    event.stopPropagation();
+    cancelNoteRef.current = false;
+    setEditingVisitorId(visitor.visitor_id);
+    setNoteDraft(visitor.note || '');
+  }
+  async function saveVisitorNote(visitor) {
+    if (cancelNoteRef.current) {
+      cancelNoteRef.current = false;
+      return;
+    }
+    const note = normalizeVisitorNote(noteDraft);
+    setEditingVisitorId('');
+    try {
+      await updateAnalyticsVisitorNote(visitor.visitor_id, note);
+      setVisitors((items) => items.map((item) => item.visitor_id === visitor.visitor_id ? { ...item, note } : item));
+      setVisitorDetail((detail) => detail?.visitor_id === visitor.visitor_id ? { ...detail, note } : detail);
+    } catch (error) {
+      window.alert(error.message || '备注保存失败，请稍后重试');
+    }
+  }
   async function removeVisitor() {
     if (!visitorDetail || deletingVisitor) return;
     const shortId = visitorDetail.visitor_id.slice(0, 12);
@@ -145,8 +170,8 @@ export default function AnalyticsDashboard() {
           <Metric label="平均观看时长" value={seconds(m.avg_watch_seconds)} note={`平均进度 ${number(m.avg_progress, 1)}%`} /><Metric label="完播率" value={`${number(m.completion_rate, 1)}%`} note={`${number(m.external_jumps)} 次外部跳转`} />
         </div><div><h2 className="mb-3 font-bold">访问趋势</h2><Bars rows={trends} /></div><div><h2 className="mb-3 font-bold">热门作品</h2><WorkTable rows={workRows.slice(0, 8)} names={workNames} onSelect={openWork} /></div></div>}
         {tab === 'works' && <><WorkTable rows={workRows} names={workNames} onSelect={openWork} />{selectedWork && <div className="mt-5 rounded-xl bg-blue-50 p-4 text-sm text-blue-700">正在查看：{workNames[selectedWork.work_id] || selectedWork.work_id}</div>}<Retention detail={workDetail} /></>}
-        {tab === 'visitors' && <div className="grid gap-5 lg:grid-cols-[380px_1fr]"><div className="space-y-2">{visitors.map((visitor) => <button key={visitor.visitor_id} onClick={() => openVisitor(visitor)} className="w-full rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm hover:border-blue-200"><p className="font-mono text-xs font-bold text-slate-700">{visitor.visitor_id.slice(0, 12)}</p><p className="mt-2 text-xs text-slate-400">{visitor.city || '未知地区'}{visitor.district ? ` · ${visitor.district}` : ''} · {visitor.device_type}</p><p className="mt-1 text-xs font-medium text-slate-600">最近进入：{dateTime(visitor.last_entered_at)}</p><p className="mt-1 text-xs text-slate-400">首次进入：{dateTime(visitor.first_seen_at)} · {visitor.session_count} 次访问</p></button>)}</div>
-          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">{visitorDetail ? <><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">匿名访客 {visitorDetail.visitor_id.slice(0, 12)}</h3><button type="button" onClick={removeVisitor} disabled={deletingVisitor} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">{deletingVisitor ? '正在删除…' : '删除访客'}</button></div><p className="mt-2 text-xs text-slate-400">删除后，该访客的全部访问与观看记录将永久清除。</p><div className="mt-5 rounded-xl bg-slate-50 p-4"><p className="text-xs font-bold text-slate-500">进入时间</p><div className="mt-2 flex flex-wrap gap-2">{visitorDetail.sessions.map((session) => <span key={session.session_id} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">{dateTime(session.started_at)}</span>)}</div></div><div className="mt-5 space-y-4">{visitorDetail.events.map((event) => <div key={event.event_id} className="border-l-2 border-blue-200 pl-4"><p className="text-sm font-semibold text-slate-700">{EVENT_LABELS[event.event_type] || event.event_type}{event.work_id ? ` · ${workNames[event.work_id] || event.work_id}` : ''}</p><p className="mt-1 text-xs text-slate-400">{dateTime(event.occurred_at)}{event.position_seconds != null ? ` · ${seconds(event.position_seconds)}` : ''}{event.target_platform ? ` · ${event.target_platform}` : ''}</p></div>)}</div></> : <p className="py-20 text-center text-sm text-slate-400">选择一位访客查看完整操作轨迹</p>}</div></div>}
+        {tab === 'visitors' && <div className="grid gap-5 lg:grid-cols-[380px_1fr]"><div className="space-y-2">{visitors.map((visitor) => <div key={visitor.visitor_id} role="button" tabIndex={0} onClick={() => openVisitor(visitor)} onKeyDown={(event) => { if (event.key === 'Enter' && editingVisitorId !== visitor.visitor_id) openVisitor(visitor); }} className="w-full cursor-pointer rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm hover:border-blue-200"><div onDoubleClick={(event) => beginVisitorNote(event, visitor)} title="双击添加或修改备注">{editingVisitorId === visitor.visitor_id ? <input autoFocus value={noteDraft} maxLength={30} onChange={(event) => setNoteDraft(event.target.value)} onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()} onBlur={() => saveVisitorNote(visitor)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') { cancelNoteRef.current = true; setEditingVisitorId(''); event.currentTarget.blur(); } }} className="w-full rounded-lg border border-blue-300 px-2 py-1 text-sm font-semibold text-slate-800 outline-none ring-blue-100 focus:ring-4" placeholder="输入备注名" /> : <><p className={`${visitor.note ? 'text-sm' : 'font-mono text-xs'} font-bold text-slate-700`}>{visitor.note || visitor.visitor_id.slice(0, 12)}</p>{visitor.note && <p className="mt-1 font-mono text-[10px] text-slate-400">{visitor.visitor_id.slice(0, 12)}</p>}</>}</div><p className="mt-2 text-xs text-slate-400">{visitor.city || '未知地区'}{visitor.district ? ` · ${visitor.district}` : ''} · {visitor.device_type}</p><p className="mt-1 text-xs font-medium text-slate-600">最近进入：{dateTime(visitor.last_entered_at)}</p><p className="mt-1 text-xs text-slate-400">首次进入：{dateTime(visitor.first_seen_at)} · {visitor.session_count} 次访问</p></div>)}</div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">{visitorDetail ? <><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">{visitorDetail.note || '匿名访客'} <span className="font-mono text-xs font-normal text-slate-400">{visitorDetail.visitor_id.slice(0, 12)}</span></h3><button type="button" onClick={removeVisitor} disabled={deletingVisitor} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">{deletingVisitor ? '正在删除…' : '删除访客'}</button></div><p className="mt-2 text-xs text-slate-400">删除后，该访客的全部访问与观看记录将永久清除。</p><div className="mt-5 rounded-xl bg-slate-50 p-4"><p className="text-xs font-bold text-slate-500">进入时间</p><div className="mt-2 flex flex-wrap gap-2">{visitorDetail.sessions.map((session) => <span key={session.session_id} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">{dateTime(session.started_at)}</span>)}</div></div><div className="mt-5 space-y-4">{visitorDetail.events.map((event) => <div key={event.event_id} className="border-l-2 border-blue-200 pl-4"><p className="text-sm font-semibold text-slate-700">{EVENT_LABELS[event.event_type] || event.event_type}{event.work_id ? ` · ${workNames[event.work_id] || event.work_id}` : ''}</p><p className="mt-1 text-xs text-slate-400">{dateTime(event.occurred_at)}{event.position_seconds != null ? ` · ${seconds(event.position_seconds)}` : ''}{event.target_platform ? ` · ${event.target_platform}` : ''}{event.event_type === 'external_return' && event.metadata?.away_seconds ? ` · 离开 ${seconds(event.metadata.away_seconds)}` : ''}</p></div>)}</div></> : <p className="py-20 text-center text-sm text-slate-400">选择一位访客查看完整操作轨迹</p>}</div></div>}
         {tab === 'geo' && <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"><h2 className="mb-5 font-bold">城市 / 区县</h2><div className="space-y-4">{locations.map((place) => <div key={`${place.city}-${place.district}`}><div className="mb-1 flex justify-between text-sm"><span className="font-semibold">{place.city}{place.district ? ` · ${place.district}` : ''}</span><span className="text-slate-400">{place.visitors} 人 · 平均 {seconds(place.avg_active_seconds)}</span></div><div className="h-2 overflow-hidden rounded bg-slate-100"><div className="h-full rounded bg-blue-500" style={{ width: `${Math.max(3, place.visitors / Math.max(1, locations[0]?.visitors) * 100)}%` }} /></div></div>)}</div></div><div className="space-y-5"><div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"><h2 className="mb-4 font-bold">访问来源</h2>{sources.map((source) => <div key={source.source} className="flex justify-between border-b border-slate-50 py-2 text-sm"><span>{source.source}</span><b>{source.sessions}</b></div>)}</div><div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"><h2 className="mb-4 font-bold">设备</h2>{devices.map((device) => <div key={device.device} className="flex justify-between border-b border-slate-50 py-2 text-sm"><span>{device.device === 'mobile' ? '手机 / 平板' : device.device === 'desktop' ? '电脑' : '其他'}</span><b>{device.sessions}</b></div>)}</div></div></div>}
       </>}
     </main>

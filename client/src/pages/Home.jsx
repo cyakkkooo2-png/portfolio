@@ -5,6 +5,7 @@ import About from '../components/About';
 import Contact from '../components/Contact';
 import Footer from '../components/Footer';
 import WorkDetailModal from '../components/WorkDetailModal';
+import LocationConsent from '../components/LocationConsent';
 
 export default function Home() {
   const [selectedWork, setSelectedWork] = useState(null);
@@ -33,6 +34,7 @@ export default function Home() {
       <About />
       <Contact />
       <Footer />
+      <LocationConsent />
       {selectedWork && <WorkDetailModal work={selectedWork} onClose={() => setSelectedWork(null)} />}
     </div>
   );

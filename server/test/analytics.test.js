@@ -39,6 +39,29 @@ test('visitor timeline removes same-second duplicates and background impressions
   ]);
 });
 
+test('visitor timeline collapses browser noise around an external journey', () => {
+  const events = [
+    { event_id: 'jump', event_type: 'external_jump', work_id: 'video-a', target_platform: 'feishu', occurred_at: '2026-10-13T10:00:00.000Z' },
+    { event_id: 'hidden', event_type: 'session_end', occurred_at: '2026-10-13T10:00:01.000Z' },
+    { event_id: 'pause', event_type: 'video_pause', work_id: 'video-a', position_seconds: 4, occurred_at: '2026-10-13T10:00:08.000Z' },
+    { event_id: 'resume', event_type: 'video_resume', work_id: 'video-a', position_seconds: 4, occurred_at: '2026-10-13T10:00:08.500Z' },
+    { event_id: 'hidden-again', event_type: 'session_end', occurred_at: '2026-10-13T10:00:09.000Z' },
+    { event_id: 'open-b', event_type: 'work_open', work_id: 'article-b', occurred_at: '2026-10-13T10:00:12.000Z' },
+  ];
+
+  assert.deepEqual(cleanVisitorTimeline(events).map((event) => event.event_id), ['jump', 'open-b']);
+});
+
+test('visitor timeline keeps one explicit return after an external journey', () => {
+  const events = [
+    { event_id: 'jump', event_type: 'external_jump', work_id: 'video-a', occurred_at: '2026-10-13T10:00:00.000Z' },
+    { event_id: 'hidden', event_type: 'session_end', occurred_at: '2026-10-13T10:00:01.000Z' },
+    { event_id: 'return', event_type: 'external_return', work_id: 'video-a', occurred_at: '2026-10-13T10:02:00.000Z', metadata_json: '{"away_seconds":120}' },
+  ];
+
+  assert.deepEqual(cleanVisitorTimeline(events).map((event) => event.event_id), ['jump', 'return']);
+});
+
 test('sessions split after 30 minutes and duplicate events are ignored', () => {
   const { store, cleanup } = setup();
   try {

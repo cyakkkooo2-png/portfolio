@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import VideoPlayer from './VideoPlayer';
 import { track } from '../analytics';
-import { shouldTrackModalClose } from '../utils/analytics-policy';
+import { rememberExternalJourney, shouldTrackModalClose } from '../utils/analytics-policy';
 import {
   douyinStageStyle,
   resolveDouyinPlayerSize,
@@ -132,7 +132,9 @@ export default function WorkDetailModal({ work, onClose }) {
   function openExternal(url) {
     let host = '';
     try { host = new URL(url).hostname; } catch { host = ''; }
-    track('external_jump', { work_id: work.id, target_platform: linkPlatform.key || linkPlatform.name, target_url_host: host });
+    const platform = linkPlatform.key || linkPlatform.name;
+    rememberExternalJourney(sessionStorage, { workId: work.id, platform });
+    track('external_jump', { work_id: work.id, target_platform: platform, target_url_host: host });
     openCurrentTab(url);
   }
 
@@ -142,7 +144,9 @@ export default function WorkDetailModal({ work, onClose }) {
     try {
       const url = new URL(anchor.href, window.location.href);
       if (url.origin === window.location.origin) return;
-      track('external_jump', { work_id: work.id, target_platform: externalVideoPlatform(work, url.href).key, target_url_host: url.hostname });
+      const platform = externalVideoPlatform(work, url.href).key;
+      rememberExternalJourney(sessionStorage, { workId: work.id, platform });
+      track('external_jump', { work_id: work.id, target_platform: platform, target_url_host: url.hostname });
     } catch { /* ignore malformed links */ }
   }
 

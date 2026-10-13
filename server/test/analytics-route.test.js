@@ -26,6 +26,17 @@ test('public collection writes data that only an authenticated admin can read', 
     const session = await sessionResponse.json();
     assert.ok(session.session_id);
 
+    const locationResponse = await fetch(`${base}/api/analytics/location`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        session_id: session.session_id,
+        city: '广州市', district: '天河区',
+        latitude: 23.12, longitude: 113.36,
+      }),
+    });
+    assert.equal(locationResponse.status, 200);
+    assert.deepEqual(await locationResponse.json(), { city: '广州市', district: '天河区' });
+
     const eventResponse = await fetch(`${base}/api/analytics/events/batch`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ session_id: session.session_id, events: [{ event_id: 'route-event-1', event_type: 'work_open', work_id: 'work-route' }] }),
@@ -45,6 +56,19 @@ test('public collection writes data that only an authenticated admin can read', 
     assert.ok(visitor.last_entered_at);
     assert.equal(visitor.last_entered_at, visitor.first_seen_at);
     const visitorId = visitor.visitor_id;
+    const noteResponse = await fetch(`${base}/api/analytics/visitors/${visitorId}/note`, {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ note: '广州测试访客' }),
+    });
+    assert.equal(noteResponse.status, 200);
+    assert.deepEqual(await noteResponse.json(), { visitor_id: visitorId, note: '广州测试访客' });
+    const visitorDetailResponse = await fetch(`${base}/api/analytics/visitors/${visitorId}`, { headers: { authorization: `Bearer ${token}` } });
+    const visitorDetail = await visitorDetailResponse.json();
+    assert.equal(visitorDetail.note, '广州测试访客');
+    assert.equal(visitorDetail.sessions[0].city, '广州市');
+    assert.equal(visitorDetail.sessions[0].district, '天河区');
+    assert.equal(Object.hasOwn(visitorDetail.sessions[0], 'latitude'), false);
     const deleteResponse = await fetch(`${base}/api/analytics/visitors/${visitorId}`, {
       method: 'DELETE', headers: { authorization: `Bearer ${token}` },
     });

@@ -1,4 +1,4 @@
-import { createPageExitGate } from './utils/analytics-policy';
+import { consumeExternalJourney, createPageExitGate } from './utils/analytics-policy';
 
 const QUEUE_KEY = 'ccy_analytics_queue_v1';
 let sessionId = '';
@@ -76,8 +76,32 @@ export async function flushAnalytics({ beacon = false } = {}) {
 
 export function createWatchId() { return id(); }
 
+export async function updateAnalyticsLocation(location) {
+  const session = await initAnalytics();
+  if (!session?.session_id) return false;
+  const response = await fetch('/api/analytics/location', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...tokenHeader() },
+    body: JSON.stringify({
+      session_id: session.session_id,
+      city: location.city,
+      district: location.district,
+    }),
+  });
+  return response.ok;
+}
+
 export function startAnalyticsLifecycle() {
-  initAnalytics();
+  const trackExternalReturn = () => {
+    const journey = consumeExternalJourney(sessionStorage);
+    if (!journey) return;
+    track('external_return', {
+      work_id: journey.workId,
+      target_platform: journey.platform,
+      metadata: { away_seconds: journey.awaySeconds },
+    });
+  };
+  initAnalytics().then(trackExternalReturn);
   const exitGate = createPageExitGate();
   let activeSeconds = 0;
   let lastInteraction = Date.now();
@@ -93,17 +117,19 @@ export function startAnalyticsLifecycle() {
   };
   const hidden = () => {
     if (document.visibilityState === 'hidden') flush();
-    else exitGate.resume();
+    else { exitGate.resume(); trackExternalReturn(); }
   };
-  const resume = () => exitGate.resume();
+  const resume = () => { exitGate.resume(); trackExternalReturn(); };
   window.addEventListener('pagehide', flush);
   window.addEventListener('pageshow', resume);
+  window.addEventListener('focus', resume);
   document.addEventListener('visibilitychange', hidden);
   return () => {
     clearInterval(interval);
     ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach((name) => window.removeEventListener(name, activity));
     window.removeEventListener('pagehide', flush);
     window.removeEventListener('pageshow', resume);
+    window.removeEventListener('focus', resume);
     document.removeEventListener('visibilitychange', hidden);
   };
 }

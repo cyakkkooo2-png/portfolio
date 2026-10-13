@@ -62,6 +62,16 @@ router.post('/events/batch', rateLimit, optionalAuthMiddleware, (req, res) => {
   }
 });
 
+router.post('/location', rateLimit, optionalAuthMiddleware, (req, res) => {
+  const sessionId = String(req.body?.session_id || '').slice(0, 80);
+  const result = store.updateSessionLocation(sessionId, {
+    city: req.body?.city,
+    district: req.body?.district,
+  });
+  if (!result) return res.status(400).json({ error: '定位结果无效或会话已失效' });
+  res.json(result);
+});
+
 router.use(authMiddleware);
 router.get('/overview', (req, res) => res.json(store.overview(req.query)));
 router.get('/trends', (req, res) => res.json({ trends: store.trends(req.query) }));
@@ -69,6 +79,11 @@ router.get('/works', (req, res) => res.json({ works: store.works(req.query) }));
 router.get('/works/:id', (req, res) => res.json(store.workDetail(req.params.id, req.query)));
 router.get('/visitors', (req, res) => res.json({ visitors: store.visitors(req.query) }));
 router.get('/visitors/:id', (req, res) => res.json(store.visitorDetail(req.params.id, req.query)));
+router.patch('/visitors/:id/note', (req, res) => {
+  const result = store.updateVisitorNote(req.params.id, req.body?.note);
+  if (!result) return res.status(404).json({ error: '访客不存在或已被删除' });
+  res.json(result);
+});
 router.delete('/visitors/:id', (req, res) => {
   const result = store.deleteVisitor(req.params.id);
   if (!result) return res.status(404).json({ error: '访客不存在或已被删除' });

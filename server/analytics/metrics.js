@@ -14,7 +14,7 @@ function isComplete(maxPosition, duration) {
 }
 
 function normalizeEvent(raw = {}) {
-  const allowedMetadata = ['from', 'to', 'visible_ratio', 'watch_id', 'path', 'reason'];
+  const allowedMetadata = ['from', 'to', 'visible_ratio', 'watch_id', 'path', 'reason', 'away_seconds'];
   const metadata = {};
   const sourceMetadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {};
   allowedMetadata.forEach((key) => {
@@ -57,7 +57,21 @@ function cleanVisitorTimeline(events = []) {
   }
 
   let activeWork = null;
+  let externalJourney = null;
   return [...unique.values()].filter((event) => {
+    if (event.event_type === 'external_jump') {
+      externalJourney = { workId: event.work_id || null };
+      return true;
+    }
+    if (externalJourney) {
+      if (event.event_type === 'external_return') {
+        externalJourney = null;
+        return true;
+      }
+      if (['session_end', 'video_pause', 'video_resume'].includes(event.event_type)
+        && (!event.work_id || event.work_id === externalJourney.workId)) return false;
+      externalJourney = null;
+    }
     if (event.event_type === 'work_open') activeWork = event.work_id || null;
     if (event.event_type === 'work_impression' && activeWork && event.work_id !== activeWork) return false;
     if (event.event_type === 'work_close' && event.work_id === activeWork) activeWork = null;
