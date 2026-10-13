@@ -61,6 +61,14 @@ export function getStats() {
   return request('/stats');
 }
 
+export function getAnalyticsOverview(query = '') { return request(`/analytics/overview${query}`); }
+export function getAnalyticsTrends(query = '') { return request(`/analytics/trends${query}`); }
+export function getAnalyticsWorks(query = '') { return request(`/analytics/works${query}`); }
+export function getAnalyticsWork(id, query = '') { return request(`/analytics/works/${id}${query}`); }
+export function getAnalyticsVisitors(query = '') { return request(`/analytics/visitors${query}`); }
+export function getAnalyticsVisitor(id, query = '') { return request(`/analytics/visitors/${id}${query}`); }
+export function getAnalyticsGeo(query = '') { return request(`/analytics/geo${query}`); }
+
 export function deleteWork(id) {
   return request(`/works/${id}`, {
     method: 'DELETE',

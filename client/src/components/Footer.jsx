@@ -20,6 +20,9 @@ export default function Footer() {
           })}
         </div>
         <RichText as="p" value={t?.footerCopyright} fallback="© 2026 CCY SPACE. All rights reserved." className="mt-9 text-xs" style={{ color: 'rgba(255,255,255,0.28)' }} />
+        <p className="mx-auto mt-3 max-w-2xl text-[11px] leading-5" style={{ color: 'rgba(255,255,255,0.22)' }}>
+          本站使用第一方匿名 Cookie 统计访问、作品浏览与视频播放表现，用于改进内容展示；不保存完整 IP 或精确位置，访问明细最长保留 180 天。
+        </p>
       </div>
     </footer>
   );

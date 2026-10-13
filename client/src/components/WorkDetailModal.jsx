@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import VideoPlayer from './VideoPlayer';
+import { track } from '../analytics';
 import {
   douyinStageStyle,
   resolveDouyinPlayerSize,
@@ -40,12 +41,13 @@ function openCurrentTab(url) {
 function externalVideoPlatform(work, url = '') {
   const source = `${url} ${(work?.tags || []).join(' ')}`.toLowerCase();
   if (/douyin\.com|iesdouyin\.com|抖音/.test(source)) {
-    return { name: '抖音', action: '打开抖音观看' };
+    return { key: 'douyin', name: '抖音', action: '打开抖音观看' };
   }
   if (/bilibili\.com|b23\.tv|B站/i.test(source)) {
-    return { name: 'B站', action: '打开B站播放' };
+    return { key: 'bilibili', name: 'B站', action: '打开B站播放' };
   }
-  return { name: '原平台', action: '打开原网页播放' };
+  if (/feishu\.cn|larksuite\.com|飞书/i.test(source)) return { key: 'feishu', name: '飞书', action: '打开飞书观看' };
+  return { key: 'external', name: '原平台', action: '打开原网页播放' };
 }
 
 function douyinVideoId(url = '') {
@@ -119,11 +121,33 @@ export default function WorkDetailModal({ work, onClose }) {
 
   if (!work) return null;
 
+  function closeModal() {
+    track('work_close', { work_id: work.id, metadata: { reason: 'modal_close' } });
+    onClose();
+  }
+
+  function openExternal(url) {
+    let host = '';
+    try { host = new URL(url).hostname; } catch { host = ''; }
+    track('external_jump', { work_id: work.id, target_platform: linkPlatform.key || linkPlatform.name, target_url_host: host });
+    openCurrentTab(url);
+  }
+
+  function captureExternalLink(event) {
+    const anchor = event.target.closest?.('a[href]');
+    if (!anchor) return;
+    try {
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin === window.location.origin) return;
+      track('external_jump', { work_id: work.id, target_platform: externalVideoPlatform(work, url.href).key, target_url_host: url.hostname });
+    } catch { /* ignore malformed links */ }
+  }
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8"
       style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(16px)', animation: 'fadeIn 0.3s ease' }}
-      onClick={onClose}
+      onClick={closeModal}
     >
       <div
         className="relative flex h-[92dvh] w-full flex-col overflow-hidden rounded-2xl transition-[max-width] duration-300"
@@ -135,9 +159,10 @@ export default function WorkDetailModal({ work, onClose }) {
           animation: 'fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
         onClick={(event) => event.stopPropagation()}
+        onClickCapture={captureExternalLink}
       >
         <button
-          onClick={onClose}
+          onClick={closeModal}
           className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 hover:scale-110 hover:rotate-90"
           style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
         >
@@ -155,6 +180,7 @@ export default function WorkDetailModal({ work, onClose }) {
           {work.type === 'video' && (isDouyinEmbed || isFeishuProxy) ? (
             <div className="relative h-full w-full overflow-hidden bg-black">
               <VideoPlayer
+                workId={work.id}
                 src={`/api/works/${work.id}/${isFeishuProxy ? 'feishu-video' : 'douyin-video'}`}
                 title={work.title || (isFeishuProxy ? '飞书视频' : '抖音视频')}
                 containerClassName="h-full w-full bg-black"
@@ -198,7 +224,7 @@ export default function WorkDetailModal({ work, onClose }) {
                   <p className="text-sm font-semibold text-white">{linkPlatform.name}视频</p>
                   <p className="mt-1 text-xs text-white/60">该视频需要跳转到{linkPlatform.name}原网页播放。</p>
                 </div>
-                <button type="button" onClick={() => openCurrentTab(originalUrl)} className="rounded-full px-5 py-2 text-sm font-semibold text-white" style={{ background: acc }}>
+                <button type="button" onClick={() => openExternal(originalUrl)} className="rounded-full px-5 py-2 text-sm font-semibold text-white" style={{ background: acc }}>
                   {linkPlatform.action}
                 </button>
               </div>
@@ -206,6 +232,7 @@ export default function WorkDetailModal({ work, onClose }) {
           ) : work.type === 'video' ? (
             <div className="relative h-full w-full">
               <VideoPlayer
+                workId={work.id}
                 src={work.file_path}
                 title={work.title}
                 containerClassName="h-full w-full bg-black"
@@ -229,7 +256,7 @@ export default function WorkDetailModal({ work, onClose }) {
                     <p className="text-sm font-semibold text-white">站内播放受限</p>
                     <p className="mt-1 text-xs text-white/60">这个外部视频被原网站限制了播放方式，请打开原网页观看。</p>
                   </div>
-                  <button type="button" onClick={() => openCurrentTab(originalUrl)} className="rounded-full px-5 py-2 text-sm font-semibold text-white" style={{ background: acc }}>
+                  <button type="button" onClick={() => openExternal(originalUrl)} className="rounded-full px-5 py-2 text-sm font-semibold text-white" style={{ background: acc }}>
                     打开原网页播放
                   </button>
                 </div>
@@ -294,7 +321,7 @@ export default function WorkDetailModal({ work, onClose }) {
           {(work.external_url || work.source_url) && !isExternalVideo && !isDouyinEmbed && !isFeishuProxy && !isWebPlayerEmbed && work.type !== 'article' && (
             <button
               type="button"
-              onClick={() => openCurrentTab(work.external_url || work.source_url)}
+              onClick={() => openExternal(work.external_url || work.source_url)}
               className="mb-5 inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold text-white no-underline transition hover:opacity-90"
               style={{ background: acc }}
             >

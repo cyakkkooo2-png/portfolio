@@ -12,6 +12,7 @@ const worksRoutes = require('./routes/works');
 const statsRoutes = require('./routes/stats');
 const contactRoutes = require('./routes/contact');
 const themeRoutes = require('./routes/theme');
+const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -28,6 +29,7 @@ app.use('/api/works', worksRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/theme', themeRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({

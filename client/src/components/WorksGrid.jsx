@@ -7,6 +7,7 @@ import { imageAspectRatio, splitImageWorksByOrientation } from '../utils/image-l
 import { externalVideoPreviewSrc, formatVideoDuration, videoMetadataSrc } from '../utils/external-video-preview';
 import { moveSelectedWorksToBottom } from '../utils/work-order';
 import { FALLBACK_LINK_TEXT, FEISHU_WORKS_HELP_URL } from '../utils/work-description';
+import { track } from '../analytics';
 
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
@@ -221,6 +222,29 @@ export default function WorksGrid({ onSelectWork }) {
     return items;
   }, [filter, measuredImageRatios, visibleWorks]);
 
+  useEffect(() => {
+    const seen = new Set();
+    const timers = new Map();
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        const workId = entry.target.dataset.workCard;
+        if (!workId || seen.has(workId)) return;
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          const timer = setTimeout(() => {
+            seen.add(workId);
+            track('work_impression', { work_id: workId, metadata: { visible_ratio: entry.intersectionRatio } });
+          }, 1000);
+          timers.set(workId, timer);
+        } else if (timers.has(workId)) {
+          clearTimeout(timers.get(workId));
+          timers.delete(workId);
+        }
+      });
+    }, { threshold: [0.5] });
+    document.querySelectorAll('[data-work-card]').forEach((element) => observer.observe(element));
+    return () => { observer.disconnect(); timers.forEach(clearTimeout); };
+  }, [displayWorks]);
+
   const visibleWorkIds = useMemo(() => visibleWorks.map((work) => work.id), [visibleWorks]);
   const selectedVisibleCount = useMemo(
     () => visibleWorkIds.filter((id) => selectedWorkSet.has(id)).length,
@@ -263,6 +287,7 @@ export default function WorksGrid({ onSelectWork }) {
 
   function handleWorkClick(work) {
     if (!canArrange) {
+      track('work_open', { work_id: work.id });
       onSelectWork?.(work);
       return;
     }
