@@ -60,3 +60,14 @@ body {
 .admin-scroll::-webkit-scrollbar-track { background: #1a1a2e; }
 .admin-scroll::-webkit-scrollbar-thumb { background: #2d2d44; border-radius: 3px; }
 .admin-scroll::-webkit-scrollbar-thumb:hover { background: #3d3d5c; }
+
+/* Keep the analytics visitor list scrollable without showing a divider-like bar. */
+.analytics-visitor-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.analytics-visitor-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}

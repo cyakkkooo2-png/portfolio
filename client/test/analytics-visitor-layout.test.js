@@ -12,6 +12,7 @@ test('keeps the desktop visitor list visible with its own scroll area', () => {
   assert.match(classes, /lg:max-h-\[calc\(100vh-/);
   assert.match(classes, /lg:overflow-y-auto/);
   assert.match(classes, /lg:overscroll-contain/);
+  assert.match(classes, /analytics-visitor-scroll/);
 });
 
 test('supports selecting visitors individually and selecting every visible visitor', () => {

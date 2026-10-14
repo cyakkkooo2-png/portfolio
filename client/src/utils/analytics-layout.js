@@ -1,5 +1,5 @@
 export function visitorListClassName() {
-  return 'space-y-2 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-2';
+  return 'analytics-visitor-scroll space-y-2 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-2';
 }
 
 export function allVisitorIds(visitors = []) {
