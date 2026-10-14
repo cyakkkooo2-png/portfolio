@@ -22,6 +22,6 @@ export function toggleAllVisitorSelection(visitors = [], selectedIds = []) {
 }
 
 export function visitorCardClassName(isActive) {
-  const border = isActive ? 'border-blue-200 hover:border-blue-300' : 'border-slate-100 hover:border-blue-200';
+  const border = isActive ? 'border-blue-400 hover:border-blue-500' : 'border-slate-100 hover:border-blue-200';
   return `relative w-full cursor-pointer rounded-2xl border ${border} bg-white p-4 pr-20 text-left shadow-sm transition-colors`;
 }

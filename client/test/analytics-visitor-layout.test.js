@@ -41,7 +41,7 @@ test('the visitor being viewed gets only a subtle blue border', () => {
   const active = layout.visitorCardClassName(true);
   const inactive = layout.visitorCardClassName(false);
 
-  assert.match(active, /border-blue-200/);
+  assert.match(active, /border-blue-400/);
   assert.doesNotMatch(active, /bg-blue/);
   assert.match(inactive, /border-slate-100/);
 });
