@@ -11,3 +11,17 @@ export function toggleVisitorSelection(selectedIds, visitorId) {
     ? selectedIds.filter((id) => id !== visitorId)
     : [...selectedIds, visitorId];
 }
+
+export function areAllVisitorsSelected(visitors = [], selectedIds = []) {
+  const visitorIds = allVisitorIds(visitors);
+  return visitorIds.length > 0 && visitorIds.every((id) => selectedIds.includes(id));
+}
+
+export function toggleAllVisitorSelection(visitors = [], selectedIds = []) {
+  return areAllVisitorsSelected(visitors, selectedIds) ? [] : allVisitorIds(visitors);
+}
+
+export function visitorCardClassName(isActive) {
+  const border = isActive ? 'border-blue-200 hover:border-blue-300' : 'border-slate-100 hover:border-blue-200';
+  return `relative w-full cursor-pointer rounded-2xl border ${border} bg-white p-4 pr-20 text-left shadow-sm transition-colors`;
+}
