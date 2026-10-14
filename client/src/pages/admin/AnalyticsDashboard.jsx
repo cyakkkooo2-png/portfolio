@@ -170,7 +170,7 @@ export default function AnalyticsDashboard() {
   }
   const m = overview.metrics || {};
 
-  return <div className="min-h-screen bg-slate-50 text-slate-900">
+  return <div className="analytics-dashboard min-h-screen bg-slate-50 text-slate-900">
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-5 py-4">
         <Link to="/admin" className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white no-underline">← 后台</Link>

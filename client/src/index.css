@@ -71,3 +71,19 @@ body {
   width: 0;
   height: 0;
 }
+
+/* Analytics uses a light canvas, so its document scrollbar stays subtle. */
+html:has(.analytics-dashboard) {
+  scrollbar-color: #c5cbd3 #f1f3f5;
+  scrollbar-width: thin;
+}
+html:has(.analytics-dashboard)::-webkit-scrollbar {
+  width: 7px;
+}
+html:has(.analytics-dashboard)::-webkit-scrollbar-track {
+  background: #f1f3f5;
+}
+html:has(.analytics-dashboard)::-webkit-scrollbar-thumb {
+  background: #c5cbd3;
+  border-radius: 999px;
+}

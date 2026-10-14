@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   allVisitorIds, toggleVisitorSelection, visitorListClassName,
 } from '../src/utils/analytics-layout.js';
@@ -20,4 +21,11 @@ test('supports selecting visitors individually and selecting every visible visit
   assert.deepEqual(allVisitorIds(visitors), ['a', 'b', 'c']);
   assert.deepEqual(toggleVisitorSelection(['a'], 'b'), ['a', 'b']);
   assert.deepEqual(toggleVisitorSelection(['a', 'b'], 'a'), ['b']);
+});
+
+test('uses a slim light page scrollbar on the analytics dashboard', () => {
+  const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
+
+  assert.match(css, /html:has\(\.analytics-dashboard\)::-webkit-scrollbar-track\s*{[^}]*background:\s*#f1f3f5/s);
+  assert.match(css, /html:has\(\.analytics-dashboard\)::-webkit-scrollbar-thumb\s*{[^}]*background:\s*#c5cbd3/s);
 });
