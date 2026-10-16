@@ -82,8 +82,8 @@ test('overview excludes internal visits unless requested', () => {
   try {
     const publicSession = store.startSession({ visitorId: 'public', now: '2026-10-13T10:00:00.000Z' });
     const adminSession = store.startSession({ visitorId: 'admin', now: '2026-10-13T10:00:00.000Z', isInternal: true });
-    store.ingestEvents({ visitorId: 'public', sessionId: publicSession.sessionId, events: [{ event_id: 'p1', event_type: 'work_open', work_id: 'w1', occurred_at: '2026-10-13T10:01:00.000Z' }] });
-    store.ingestEvents({ visitorId: 'admin', sessionId: adminSession.sessionId, isInternal: true, events: [{ event_id: 'a1', event_type: 'work_open', work_id: 'w1', occurred_at: '2026-10-13T10:01:00.000Z' }] });
+    store.ingestEvents({ visitorId: 'public', sessionId: publicSession.sessionId, events: [{ event_id: 'p1', event_type: 'work_open', work_id: 'w1', occurred_at: '2026-10-13T10:01:00.000Z', active_seconds: 10 }] });
+    store.ingestEvents({ visitorId: 'admin', sessionId: adminSession.sessionId, isInternal: true, events: [{ event_id: 'a1', event_type: 'work_open', work_id: 'w1', occurred_at: '2026-10-13T10:01:00.000Z', active_seconds: 10 }] });
     assert.equal(store.overview({ start: '2026-10-13', end: '2026-10-13' }).metrics.work_opens, 1);
     assert.equal(store.overview({ start: '2026-10-13', end: '2026-10-13', include_internal: 'true' }).metrics.work_opens, 2);
   } finally { cleanup(); }
@@ -94,12 +94,62 @@ test('a play is counted only after one second of real watch time', () => {
   try {
     const session = store.startSession({ visitorId: 'viewer', now: '2026-10-13T10:00:00.000Z' });
     store.ingestEvents({ visitorId: 'viewer', sessionId: session.sessionId, events: [
-      { event_id: 'start', event_type: 'video_start', work_id: 'video-1', occurred_at: '2026-10-13T10:01:00.000Z', metadata: { watch_id: 'watch-1' } },
+      { event_id: 'start', event_type: 'video_start', work_id: 'video-1', occurred_at: '2026-10-13T10:01:00.000Z', active_seconds: 10, metadata: { watch_id: 'watch-1' } },
     ] });
     assert.equal(store.overview({ start: '2026-10-13', end: '2026-10-13' }).metrics.plays, 0);
     store.ingestEvents({ visitorId: 'viewer', sessionId: session.sessionId, events: [
       { event_id: 'beat', event_type: 'video_heartbeat', work_id: 'video-1', occurred_at: '2026-10-13T10:01:02.000Z', watched_seconds: 1.2, position_seconds: 1.2, max_position_seconds: 1.2, duration_seconds: 60, metadata: { watch_id: 'watch-1' } },
     ] });
     assert.equal(store.overview({ start: '2026-10-13', end: '2026-10-13' }).metrics.plays, 1);
+  } finally { cleanup(); }
+});
+
+test('admin analytics ignores sessions under ten seconds or without an explicit action', () => {
+  const { store, cleanup } = setup();
+  try {
+    const seed = ({ visitorId, city, activeSeconds, events }) => {
+      const session = store.startSession({
+        visitorId,
+        now: '2026-10-13T10:00:00.000Z',
+        geo: { city, district: '测试区' },
+      });
+      store.ingestEvents({
+        visitorId,
+        sessionId: session.sessionId,
+        events: events.map((event, index) => ({
+          event_id: `${visitorId}-${index}`,
+          occurred_at: `2026-10-13T10:00:${String(index + 1).padStart(2, '0')}.000Z`,
+          active_seconds: activeSeconds,
+          ...event,
+        })),
+      });
+      return session;
+    };
+
+    seed({
+      visitorId: 'short-with-action', city: '佛山市', activeSeconds: 9,
+      events: [{ event_type: 'page_view' }, { event_type: 'work_open', work_id: 'short-work' }],
+    });
+    seed({
+      visitorId: 'long-without-action', city: '深圳市', activeSeconds: 30,
+      events: [{ event_type: 'page_view' }, { event_type: 'work_impression', work_id: 'passive-work' }, { event_type: 'session_end' }],
+    });
+    seed({
+      visitorId: 'valid', city: '广州市', activeSeconds: 12,
+      events: [{ event_type: 'page_view' }, { event_type: 'work_open', work_id: 'valid-work' }, { event_type: 'session_end' }],
+    });
+
+    const query = { start: '2026-10-13', end: '2026-10-13' };
+    const overview = store.overview(query).metrics;
+    assert.equal(overview.uv, 1);
+    assert.equal(overview.sessions, 1);
+    assert.equal(overview.new_visitors, 1);
+    assert.equal(overview.work_opens, 1);
+    assert.deepEqual(store.visitors(query).map((visitor) => visitor.visitor_id), ['valid']);
+    assert.deepEqual(store.works(query).map((work) => work.work_id), ['valid-work']);
+    assert.deepEqual(store.geo(query).locations.map((location) => location.city), ['广州市']);
+    assert.equal(store.visitorDetail('short-with-action', query).sessions.length, 0);
+    assert.equal(store.visitorDetail('long-without-action', query).events.length, 0);
+    assert.equal(store.visitorDetail('valid', query).sessions.length, 1);
   } finally { cleanup(); }
 });

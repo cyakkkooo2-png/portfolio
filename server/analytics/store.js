@@ -10,6 +10,28 @@ const EVENT_TYPES = new Set([
   'external_jump', 'external_return', 'session_end',
 ]);
 
+const MEANINGFUL_EVENT_TYPES = [
+  'work_open', 'video_start', 'video_pause', 'video_resume', 'video_seek',
+  'video_heartbeat', 'video_complete', 'external_jump', 'external_return',
+];
+const MEANINGFUL_EVENT_SQL = MEANINGFUL_EVENT_TYPES.map((type) => `'${type}'`).join(',');
+
+function validSessionClause(alias = 's') {
+  return `${alias}.active_seconds >= 10 AND EXISTS (
+    SELECT 1 FROM analytics_events meaningful
+    WHERE meaningful.session_id=${alias}.session_id
+      AND meaningful.event_type IN (${MEANINGFUL_EVENT_SQL})
+  )`;
+}
+
+function validRelatedSessionClause(alias = 'v') {
+  return `EXISTS (
+    SELECT 1 FROM analytics_sessions valid_session
+    WHERE valid_session.session_id=${alias}.session_id
+      AND ${validSessionClause('valid_session')}
+  )`;
+}
+
 function dateOnly(value) {
   return new Date(value).toISOString().slice(0, 10);
 }
@@ -91,6 +113,7 @@ class AnalyticsStore {
       CREATE INDEX IF NOT EXISTS idx_events_time ON analytics_events(occurred_at);
       CREATE INDEX IF NOT EXISTS idx_events_work ON analytics_events(work_id, occurred_at);
       CREATE INDEX IF NOT EXISTS idx_events_visitor ON analytics_events(visitor_id, occurred_at);
+      CREATE INDEX IF NOT EXISTS idx_events_session_type ON analytics_events(session_id, event_type);
       CREATE INDEX IF NOT EXISTS idx_sessions_time ON analytics_sessions(started_at);
       CREATE INDEX IF NOT EXISTS idx_video_work ON analytics_video_sessions(work_id, started_at);
       CREATE UNIQUE INDEX IF NOT EXISTS uniq_impression_session_work
@@ -212,31 +235,39 @@ class AnalyticsStore {
 
   overview(query = {}) {
     const f = this.filters(query);
-    const internalClause = f.internal ? '' : 'AND is_internal = 0';
+    const eventInternalClause = f.internal ? '' : 'AND e.is_internal = 0';
+    const sessionInternalClause = f.internal ? '' : 'AND s.is_internal = 0';
     const events = this.db.prepare(`SELECT
-      COUNT(DISTINCT visitor_id) uv,
-      COUNT(DISTINCT session_id) sessions,
-      SUM(event_type='work_open') work_opens,
-      SUM(event_type='video_start') video_starts,
-      SUM(event_type='external_jump') external_jumps
-      FROM analytics_events WHERE occurred_at BETWEEN ? AND ? ${internalClause}`).get(f.start, f.end);
-    const video = this.db.prepare(`SELECT COUNT(CASE WHEN watched_seconds>=1 THEN 1 END) plays, COALESCE(SUM(CASE WHEN watched_seconds>=1 THEN watched_seconds ELSE 0 END),0) watched_seconds,
-      COALESCE(AVG(watched_seconds),0) avg_watch_seconds,
-      COALESCE(AVG(CASE WHEN duration_seconds>0 THEN max_position_seconds/duration_seconds*100 END),0) avg_progress,
-      COALESCE(AVG(completed)*100,0) completion_rate
-      FROM analytics_video_sessions WHERE started_at BETWEEN ? AND ? AND watched_seconds>=1 ${internalClause}`).get(f.start, f.end);
-    const newVisitors = this.db.prepare(`SELECT COUNT(*) count FROM analytics_visitors WHERE first_seen_at BETWEEN ? AND ?`).get(f.start, f.end).count;
+      COUNT(DISTINCT e.visitor_id) uv,
+      COUNT(DISTINCT e.session_id) sessions,
+      SUM(e.event_type='work_open') work_opens,
+      SUM(e.event_type='video_start') video_starts,
+      SUM(e.event_type='external_jump') external_jumps
+      FROM analytics_events e WHERE e.occurred_at BETWEEN ? AND ? ${eventInternalClause}
+      AND ${validRelatedSessionClause('e')}`).get(f.start, f.end);
+    const video = this.db.prepare(`SELECT COUNT(CASE WHEN v.watched_seconds>=1 THEN 1 END) plays, COALESCE(SUM(CASE WHEN v.watched_seconds>=1 THEN v.watched_seconds ELSE 0 END),0) watched_seconds,
+      COALESCE(AVG(v.watched_seconds),0) avg_watch_seconds,
+      COALESCE(AVG(CASE WHEN v.duration_seconds>0 THEN v.max_position_seconds/v.duration_seconds*100 END),0) avg_progress,
+      COALESCE(AVG(v.completed)*100,0) completion_rate
+      FROM analytics_video_sessions v JOIN analytics_sessions s ON s.session_id=v.session_id
+      WHERE v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${sessionInternalClause}
+      AND ${validSessionClause('s')}`).get(f.start, f.end);
+    const newVisitors = this.db.prepare(`SELECT COUNT(DISTINCT v.visitor_id) count
+      FROM analytics_visitors v JOIN analytics_sessions s ON s.visitor_id=v.visitor_id
+      WHERE v.first_seen_at BETWEEN ? AND ? AND s.started_at BETWEEN ? AND ? ${sessionInternalClause}
+      AND ${validSessionClause('s')}`).get(f.start, f.end, f.start, f.end).count;
     return { range: f, metrics: { ...events, ...video, new_visitors: newVisitors } };
   }
 
   trends(query = {}) {
     const f = this.filters(query);
-    const internalClause = f.internal ? '' : 'AND is_internal = 0';
-    return this.db.prepare(`SELECT strftime('%Y-%m-%d', occurred_at, '+8 hours') day,
-      COUNT(DISTINCT visitor_id) uv, COUNT(DISTINCT session_id) sessions,
-      SUM(event_type='work_open') work_opens, SUM(event_type='video_start') video_starts,
-      SUM(COALESCE(watched_seconds,0)) watched_seconds
-      FROM analytics_events WHERE occurred_at BETWEEN ? AND ? ${internalClause}
+    const internalClause = f.internal ? '' : 'AND e.is_internal = 0';
+    return this.db.prepare(`SELECT strftime('%Y-%m-%d', e.occurred_at, '+8 hours') day,
+      COUNT(DISTINCT e.visitor_id) uv, COUNT(DISTINCT e.session_id) sessions,
+      SUM(e.event_type='work_open') work_opens, SUM(e.event_type='video_start') video_starts,
+      SUM(COALESCE(e.watched_seconds,0)) watched_seconds
+      FROM analytics_events e WHERE e.occurred_at BETWEEN ? AND ? ${internalClause}
+      AND ${validRelatedSessionClause('e')}
       GROUP BY day ORDER BY day`).all(f.start, f.end);
   }
 
@@ -248,19 +279,21 @@ class AnalyticsStore {
       SUM(e.event_type='work_open') opens,
       COUNT(DISTINCT CASE WHEN e.event_type='work_open' THEN e.visitor_id END) open_uv,
       SUM(e.event_type='external_jump') external_jumps,
-      COALESCE((SELECT COUNT(*) FROM analytics_video_sessions v WHERE v.work_id=e.work_id AND v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${f.internal ? '' : 'AND v.is_internal=0'}),0) plays,
-      COALESCE((SELECT AVG(v.watched_seconds) FROM analytics_video_sessions v WHERE v.work_id=e.work_id AND v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${f.internal ? '' : 'AND v.is_internal=0'}),0) avg_watch_seconds,
-      COALESCE((SELECT AVG(v.completed)*100 FROM analytics_video_sessions v WHERE v.work_id=e.work_id AND v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${f.internal ? '' : 'AND v.is_internal=0'}),0) completion_rate,
-      COALESCE((SELECT AVG(v.watched_seconds<3)*100 FROM analytics_video_sessions v WHERE v.work_id=e.work_id AND v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${f.internal ? '' : 'AND v.is_internal=0'}),0) short_bounce_rate,
-      COALESCE((SELECT AVG(CASE WHEN v.duration_seconds>0 THEN v.max_position_seconds/v.duration_seconds*100 END) FROM analytics_video_sessions v WHERE v.work_id=e.work_id AND v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${f.internal ? '' : 'AND v.is_internal=0'}),0) avg_progress
+      COALESCE((SELECT COUNT(*) FROM analytics_video_sessions v WHERE v.work_id=e.work_id AND v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${f.internal ? '' : 'AND v.is_internal=0'} AND ${validRelatedSessionClause('v')}),0) plays,
+      COALESCE((SELECT AVG(v.watched_seconds) FROM analytics_video_sessions v WHERE v.work_id=e.work_id AND v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${f.internal ? '' : 'AND v.is_internal=0'} AND ${validRelatedSessionClause('v')}),0) avg_watch_seconds,
+      COALESCE((SELECT AVG(v.completed)*100 FROM analytics_video_sessions v WHERE v.work_id=e.work_id AND v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${f.internal ? '' : 'AND v.is_internal=0'} AND ${validRelatedSessionClause('v')}),0) completion_rate,
+      COALESCE((SELECT AVG(v.watched_seconds<3)*100 FROM analytics_video_sessions v WHERE v.work_id=e.work_id AND v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${f.internal ? '' : 'AND v.is_internal=0'} AND ${validRelatedSessionClause('v')}),0) short_bounce_rate,
+      COALESCE((SELECT AVG(CASE WHEN v.duration_seconds>0 THEN v.max_position_seconds/v.duration_seconds*100 END) FROM analytics_video_sessions v WHERE v.work_id=e.work_id AND v.started_at BETWEEN ? AND ? AND v.watched_seconds>=1 ${f.internal ? '' : 'AND v.is_internal=0'} AND ${validRelatedSessionClause('v')}),0) avg_progress
       FROM analytics_events e WHERE e.work_id IS NOT NULL AND e.occurred_at BETWEEN ? AND ? ${internalClause}
+      AND ${validRelatedSessionClause('e')}
       GROUP BY e.work_id ORDER BY opens DESC`).all(f.start, f.end, f.start, f.end, f.start, f.end, f.start, f.end, f.start, f.end, f.start, f.end);
   }
 
   workDetail(workId, query = {}) {
     const f = this.filters(query);
-    const internalClause = f.internal ? '' : 'AND is_internal = 0';
-    const watches = this.db.prepare(`SELECT * FROM analytics_video_sessions WHERE work_id=? AND started_at BETWEEN ? AND ? ${internalClause}`).all(workId, f.start, f.end);
+    const watches = this.db.prepare(`SELECT v.* FROM analytics_video_sessions v JOIN analytics_sessions s ON s.session_id=v.session_id
+      WHERE v.work_id=? AND v.started_at BETWEEN ? AND ? ${f.internal ? '' : 'AND v.is_internal = 0'}
+      AND ${validSessionClause('s')}`).all(workId, f.start, f.end);
     const maxDuration = watches.reduce((max, item) => Math.max(max, item.duration_seconds || 0), 0);
     const bucketSize = maxDuration <= 600 ? 2 : Math.max(5, Math.ceil(maxDuration / 100));
     const buckets = [];
@@ -281,14 +314,16 @@ class AnalyticsStore {
       COUNT(*) session_count, SUM(s.active_seconds) active_seconds
       FROM analytics_sessions s JOIN analytics_visitors v ON v.visitor_id=s.visitor_id
       WHERE s.started_at BETWEEN ? AND ? ${internalClause}
+      AND ${validSessionClause('s')}
       GROUP BY s.visitor_id ORDER BY last_seen_at DESC LIMIT ? OFFSET ?`).all(f.start, f.end, limit, offset);
   }
 
   visitorDetail(visitorId, query = {}) {
     const f = this.filters(query);
-    const internalClause = f.internal ? '' : 'AND is_internal=0';
-    const sessions = this.db.prepare(`SELECT * FROM analytics_sessions WHERE visitor_id=? AND started_at BETWEEN ? AND ? ${internalClause} ORDER BY started_at DESC`).all(visitorId, f.start, f.end);
-    const events = cleanVisitorTimeline(this.db.prepare(`SELECT * FROM analytics_events WHERE visitor_id=? AND occurred_at BETWEEN ? AND ? ${internalClause} ORDER BY occurred_at`).all(visitorId, f.start, f.end))
+    const sessions = this.db.prepare(`SELECT s.* FROM analytics_sessions s WHERE s.visitor_id=? AND s.started_at BETWEEN ? AND ?
+      ${f.internal ? '' : 'AND s.is_internal=0'} AND ${validSessionClause('s')} ORDER BY s.started_at DESC`).all(visitorId, f.start, f.end);
+    const events = cleanVisitorTimeline(this.db.prepare(`SELECT e.* FROM analytics_events e WHERE e.visitor_id=? AND e.occurred_at BETWEEN ? AND ?
+      ${f.internal ? '' : 'AND e.is_internal=0'} AND ${validRelatedSessionClause('e')} ORDER BY e.occurred_at`).all(visitorId, f.start, f.end))
       .map((event) => ({ ...event, metadata: JSON.parse(event.metadata_json || '{}') }));
     const visitor = this.db.prepare('SELECT note FROM analytics_visitors WHERE visitor_id=?').get(visitorId);
     return { visitor_id: visitorId, note: visitor?.note || '', sessions, events };
@@ -318,13 +353,16 @@ class AnalyticsStore {
     const internalClause = f.internal ? '' : 'AND is_internal = 0';
     const locations = this.db.prepare(`SELECT COALESCE(city,'未知') city, COALESCE(district,'') district,
       COUNT(DISTINCT visitor_id) visitors, COUNT(*) sessions, AVG(active_seconds) avg_active_seconds
-      FROM analytics_sessions WHERE started_at BETWEEN ? AND ? ${internalClause}
+      FROM analytics_sessions s WHERE started_at BETWEEN ? AND ? ${internalClause}
+      AND ${validSessionClause('s')}
       GROUP BY city,district ORDER BY visitors DESC`).all(f.start, f.end);
     const sources = this.db.prepare(`SELECT COALESCE(NULLIF(referrer_host,''),'直接访问') source, COUNT(*) sessions
-      FROM analytics_sessions WHERE started_at BETWEEN ? AND ? ${internalClause}
+      FROM analytics_sessions s WHERE started_at BETWEEN ? AND ? ${internalClause}
+      AND ${validSessionClause('s')}
       GROUP BY source ORDER BY sessions DESC`).all(f.start, f.end);
     const devices = this.db.prepare(`SELECT COALESCE(device_type,'unknown') device, COUNT(*) sessions
-      FROM analytics_sessions WHERE started_at BETWEEN ? AND ? ${internalClause}
+      FROM analytics_sessions s WHERE started_at BETWEEN ? AND ? ${internalClause}
+      AND ${validSessionClause('s')}
       GROUP BY device ORDER BY sessions DESC`).all(f.start, f.end);
     return { locations, sources, devices };
   }

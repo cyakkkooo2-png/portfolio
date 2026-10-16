@@ -39,7 +39,7 @@ test('public collection writes data that only an authenticated admin can read', 
 
     const eventResponse = await fetch(`${base}/api/analytics/events/batch`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ session_id: session.session_id, events: [{ event_id: 'route-event-1', event_type: 'work_open', work_id: 'work-route' }] }),
+      body: JSON.stringify({ session_id: session.session_id, events: [{ event_id: 'route-event-1', event_type: 'work_open', work_id: 'work-route', active_seconds: 10 }] }),
     });
     assert.equal(eventResponse.status, 200);
     assert.equal((await eventResponse.json()).accepted, 1);
