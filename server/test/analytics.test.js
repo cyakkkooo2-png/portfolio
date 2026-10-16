@@ -104,7 +104,7 @@ test('a play is counted only after one second of real watch time', () => {
   } finally { cleanup(); }
 });
 
-test('admin analytics ignores sessions under ten seconds or without an explicit action', () => {
+test('admin analytics accepts ten-second impressions but ignores short or empty sessions', () => {
   const { store, cleanup } = setup();
   try {
     const seed = ({ visitorId, city, activeSeconds, events }) => {
@@ -131,8 +131,12 @@ test('admin analytics ignores sessions under ten seconds or without an explicit 
       events: [{ event_type: 'page_view' }, { event_type: 'work_open', work_id: 'short-work' }],
     });
     seed({
-      visitorId: 'long-without-action', city: '深圳市', activeSeconds: 30,
-      events: [{ event_type: 'page_view' }, { event_type: 'work_impression', work_id: 'passive-work' }, { event_type: 'session_end' }],
+      visitorId: 'long-without-action', city: '佛山市', activeSeconds: 30,
+      events: [{ event_type: 'page_view' }, { event_type: 'session_end' }],
+    });
+    seed({
+      visitorId: 'long-with-impression', city: '深圳市', activeSeconds: 10,
+      events: [{ event_type: 'page_view' }, { event_type: 'work_impression', work_id: 'impression-work' }, { event_type: 'session_end' }],
     });
     seed({
       visitorId: 'valid', city: '广州市', activeSeconds: 12,
@@ -141,15 +145,16 @@ test('admin analytics ignores sessions under ten seconds or without an explicit 
 
     const query = { start: '2026-10-13', end: '2026-10-13' };
     const overview = store.overview(query).metrics;
-    assert.equal(overview.uv, 1);
-    assert.equal(overview.sessions, 1);
-    assert.equal(overview.new_visitors, 1);
+    assert.equal(overview.uv, 2);
+    assert.equal(overview.sessions, 2);
+    assert.equal(overview.new_visitors, 2);
     assert.equal(overview.work_opens, 1);
-    assert.deepEqual(store.visitors(query).map((visitor) => visitor.visitor_id), ['valid']);
-    assert.deepEqual(store.works(query).map((work) => work.work_id), ['valid-work']);
-    assert.deepEqual(store.geo(query).locations.map((location) => location.city), ['广州市']);
+    assert.deepEqual(store.visitors(query).map((visitor) => visitor.visitor_id), ['valid', 'long-with-impression']);
+    assert.deepEqual(store.works(query).map((work) => work.work_id), ['valid-work', 'impression-work']);
+    assert.deepEqual(store.geo(query).locations.map((location) => location.city).sort(), ['广州市', '深圳市']);
     assert.equal(store.visitorDetail('short-with-action', query).sessions.length, 0);
     assert.equal(store.visitorDetail('long-without-action', query).events.length, 0);
+    assert.equal(store.visitorDetail('long-with-impression', query).sessions.length, 1);
     assert.equal(store.visitorDetail('valid', query).sessions.length, 1);
   } finally { cleanup(); }
 });

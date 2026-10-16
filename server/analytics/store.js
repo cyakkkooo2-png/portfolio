@@ -11,7 +11,7 @@ const EVENT_TYPES = new Set([
 ]);
 
 const MEANINGFUL_EVENT_TYPES = [
-  'work_open', 'video_start', 'video_pause', 'video_resume', 'video_seek',
+  'work_impression', 'work_open', 'video_start', 'video_pause', 'video_resume', 'video_seek',
   'video_heartbeat', 'video_complete', 'external_jump', 'external_return',
 ];
 const MEANINGFUL_EVENT_SQL = MEANINGFUL_EVENT_TYPES.map((type) => `'${type}'`).join(',');
