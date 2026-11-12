@@ -801,7 +801,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
               {displayWorks.map((work) => work.__section === 'project' ? (
                 <div
                   key={work.id}
-                  className="col-span-full mt-1 flex cursor-pointer items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-2 transition hover:border-gray-200 hover:bg-gray-50 first:mt-0"
+                  className="col-span-full mt-1 flex cursor-pointer items-center gap-2 px-1 py-2 first:mt-0"
                   onClick={() => toggleProject(work.projectName)}
                   title={isLoggedIn ? '单击空白处展开或收起，双击项目名称可重命名' : '单击展开或收起'}
                 >

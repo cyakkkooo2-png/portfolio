@@ -20,3 +20,13 @@ test('the vertical fallback badge has no peach or orange outer ring', () => {
   assert.match(badgeStyle, /boxShadow: '0 12px 30px rgba\(12, 86, 125, 0\.34\)'/);
   assert.doesNotMatch(badgeStyle, /rgba\(237, 183, 156/);
 });
+
+test('project group headings are plain rows without a surrounding box', () => {
+  const source = fs.readFileSync(new URL('./WorksGrid.jsx', import.meta.url), 'utf8');
+  const headerClass = source.match(/key=\{work\.id\}[\s\S]*?className="([^"]*col-span-full[^"]*)"/)?.[1] || '';
+
+  assert.ok(headerClass, 'project group heading should be present');
+  assert.doesNotMatch(headerClass, /rounded-/);
+  assert.doesNotMatch(headerClass, /\bborder\b|border-/);
+  assert.doesNotMatch(headerClass, /\bbg-|hover:bg-/);
+});
