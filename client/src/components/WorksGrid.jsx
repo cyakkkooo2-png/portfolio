@@ -10,6 +10,7 @@ import { FALLBACK_LINK_TEXT, FEISHU_WORKS_HELP_URL } from '../utils/work-descrip
 import { track } from '../analytics';
 import { shouldTrackBackgroundImpression } from '../utils/analytics-policy';
 import { groupVideoProjects, UNGROUPED_PROJECT } from '../utils/video-projects';
+import { captureVideoCover } from '../utils/video-cover';
 
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
@@ -510,6 +511,33 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
     }
   }
 
+  async function saveCover(work, file) {
+    const formData = new FormData();
+    formData.append('cover', file);
+    const data = await uploadWorkWithProgress(formData, { method: 'PUT', workId: work.id });
+    if (data.work) {
+      setWorks((current) => current.map((item) => (
+        item.id === work.id ? { ...item, ...data.work } : item
+      )));
+    }
+  }
+
+  async function handleAutoCover(event, work) {
+    event.stopPropagation();
+    if (coverBusyId) return;
+    const source = videoMetadataSrc(work);
+    if (!source) return;
+    setCoverBusyId(work.id);
+    try {
+      const cover = await captureVideoCover(source, { name: work.title });
+      await saveCover(work, cover);
+    } catch (err) {
+      alert(err.message || '自动取封面失败，请手动替换封面');
+    } finally {
+      setCoverBusyId('');
+    }
+  }
+
   async function handleReplaceCover(event, work) {
     event.stopPropagation();
     const input = event.currentTarget;
@@ -519,17 +547,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
 
     setCoverBusyId(work.id);
     try {
-      const formData = new FormData();
-      formData.append('cover', file);
-      const data = await uploadWorkWithProgress(formData, {
-        method: 'PUT',
-        workId: work.id,
-      });
-      if (data.work) {
-        setWorks((current) => current.map((item) => (
-          item.id === work.id ? { ...item, ...data.work } : item
-        )));
-      }
+      await saveCover(work, file);
     } catch (err) {
       alert(err.message || '替换封面失败');
     } finally {
@@ -945,13 +963,14 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                       </div>
                     )}
                     {isLoggedIn && !canArrange && work.type === 'video' && (
+                      <div className="absolute bottom-4 left-4 right-16 z-20 flex flex-wrap gap-1.5" onClick={(event) => event.stopPropagation()}>
                       <label
-                        className={`absolute bottom-4 left-4 z-20 inline-flex cursor-pointer items-center rounded-full px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105 ${coverBusyId && coverBusyId !== work.id ? 'pointer-events-none opacity-50' : ''}`}
+                        className={`inline-flex cursor-pointer items-center rounded-full px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105 ${coverBusyId ? 'pointer-events-none opacity-50' : ''}`}
                         style={{ background: 'rgba(255,255,255,0.95)', color: '#4b5563' }}
                         title="选择一张图片作为新封面"
                         onClick={(event) => event.stopPropagation()}
                       >
-                        {coverBusyId === work.id ? '上传中…' : '替换封面'}
+                        替换封面
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/webp,image/gif"
@@ -961,6 +980,8 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                           onChange={(event) => handleReplaceCover(event, work)}
                         />
                       </label>
+                      {videoMetadataSrc(work) && <button type="button" disabled={Boolean(coverBusyId)} onClick={(event) => handleAutoCover(event, work)} className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-gray-600 shadow-lg backdrop-blur transition hover:scale-105 disabled:opacity-50" title="从第1秒开始跳过黑屏，为此视频重新生成封面">{coverBusyId === work.id ? '处理中…' : '自动取封面'}</button>}
+                      </div>
                     )}
                     {work.type === 'video' ? (
                       <span className="absolute bottom-3 right-3 z-10 text-sm font-bold leading-none tabular-nums text-white drop-shadow-[0_1px_0_rgba(0,0,0,0.8)]">

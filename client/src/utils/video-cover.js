@@ -13,22 +13,25 @@ export function isBlackFrame(pixels) {
 
 // Scan in time order from one second, using small samples to avoid decoding
 // full-size canvases until a usable cover is found.
-export function captureVideoCover(videoFile) {
+export function captureVideoCover(videoFile, { name = 'video' } = {}) {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
-    const objectUrl = URL.createObjectURL(videoFile);
+    const remote = typeof videoFile === 'string';
+    const objectUrl = remote ? videoFile : URL.createObjectURL(videoFile);
     const sample = document.createElement('canvas');
     sample.width = 64;
     sample.height = 64;
     const context = sample.getContext('2d', { willReadFrequently: true });
     let duration;
     let settled = false;
+    let hls;
     const cleanup = () => {
       clearTimeout(timeout);
       video.onloadedmetadata = video.onseeked = video.onerror = null;
+      hls?.destroy();
       video.removeAttribute('src');
       video.load();
-      URL.revokeObjectURL(objectUrl);
+      if (!remote) URL.revokeObjectURL(objectUrl);
     };
     const fail = (message) => {
       if (settled) return;
@@ -40,6 +43,7 @@ export function captureVideoCover(videoFile) {
     video.preload = 'auto';
     video.muted = true;
     video.playsInline = true;
+    if (remote) video.crossOrigin = 'anonymous';
     video.onloadedmetadata = () => {
       duration = video.duration;
       if (!Number.isFinite(duration) || duration <= 0) {
@@ -80,7 +84,7 @@ export function captureVideoCover(videoFile) {
           }
           settled = true;
           cleanup();
-          const stem = videoFile.name.replace(/\.[^/.]+$/, '') || 'video';
+          const stem = (remote ? name : videoFile.name).replace(/\.[^/.]+$/, '') || 'video';
           resolve(new File([blob], `${stem}-cover.jpg`, { type: 'image/jpeg' }));
         }, 'image/jpeg', 0.86);
       } catch {
@@ -88,6 +92,17 @@ export function captureVideoCover(videoFile) {
       }
     };
     video.onerror = () => fail('浏览器无法读取该视频，请手动上传封面');
-    video.src = objectUrl;
+    if (remote && /\.m3u8(?:[?#]|$)/i.test(objectUrl) && !video.canPlayType('application/vnd.apple.mpegurl')) {
+      import('hls.js').then(({ default: Hls }) => {
+        if (settled) return;
+        if (!Hls.isSupported()) { fail('浏览器不支持该视频，请手动上传封面'); return; }
+        hls = new Hls({ maxBufferLength: 5, maxMaxBufferLength: 10 });
+        hls.on(Hls.Events.ERROR, (_event, data) => { if (data.fatal) fail('无法读取视频流，请手动上传封面'); });
+        hls.loadSource(objectUrl);
+        hls.attachMedia(video);
+      }).catch(() => fail('无法加载视频，请手动上传封面'));
+    } else {
+      video.src = objectUrl;
+    }
   });
 }

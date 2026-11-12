@@ -45,7 +45,7 @@ function mockVideo(t, { duration = 4, visibleAt = 2, decodeError = false } = {})
       toBlob(callback) { capturedAt = video.time; callback(new Blob(['jpeg'], { type: 'image/jpeg' })); },
     };
   } };
-  return { seeks, capturedAt: () => capturedAt, cleaned: () => revoked && unloaded };
+  return { video, seeks, capturedAt: () => capturedAt, cleaned: () => revoked && unloaded, unloaded: () => unloaded, revoked: () => revoked };
 }
 
 test('cover skips consecutive black frames and captures the first visible sampled frame', async (t) => {
@@ -80,4 +80,15 @@ test('decode errors release video resources', async (t) => {
   const media = mockVideo(t, { decodeError: true });
   await assert.rejects(captureVideoCover({ name: 'bad.mp4' }), /无法读取/);
   assert.equal(media.cleaned(), true);
+});
+
+test('existing online videos reuse the black-frame scan without creating an object URL', async (t) => {
+  const media = mockVideo(t);
+  const cover = await captureVideoCover('https://media.example/video.mp4', { name: 'Existing video' });
+  assert.deepEqual(media.seeks, [1, 1.5, 2]);
+  assert.equal(media.video.crossOrigin, 'anonymous');
+  assert.equal(cover.name, 'Existing video-cover.jpg');
+  assert.equal(media.unloaded(), true);
+  assert.equal(media.revoked(), false);
+  assert.equal(URL.createObjectURL.mock.calls.length, 0);
 });

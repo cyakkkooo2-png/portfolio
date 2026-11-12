@@ -5,6 +5,7 @@ import ProgressBar from '../../components/ProgressBar';
 import StorageBar from '../../components/StorageBar';
 import { useAuth } from '../../context/AuthContext';
 import VideoCategoryPicker from '../../components/VideoCategoryPicker';
+import VideoProjectPicker from '../../components/VideoProjectPicker';
 import { batchTitleForFile, isDuplicateUploadError, selectVideoFiles, shouldBatchUpload } from '../../utils/batch-upload';
 import { captureVideoCover } from '../../utils/video-cover';
 
@@ -199,7 +200,7 @@ function UrlImportCard({ onImported }) {
             <div className="mt-3">
               <p className="mb-2 text-xs font-semibold text-gray-600">视频分类 Tag（可选）</p>
               <VideoCategoryPicker value={category} onChange={setCategory} compact />
-              <input value={project} onChange={(e) => setProject(e.target.value)} className="mt-3 w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="项目组名称（可选）" />
+              <div className="mt-3"><VideoProjectPicker value={project} onChange={setProject} disabled={busy} /></div>
             </div>
           )}
           <input
@@ -573,7 +574,7 @@ export default function UploadWork() {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">项目组（可选）</label>
-                  <input value={project} onChange={(e) => setProject(e.target.value)} className={inputClass} placeholder="例如：澳门大奖赛" />
+                  <VideoProjectPicker value={project} onChange={setProject} disabled={uploading} />
                   <p className="mt-2 text-xs text-gray-500">同名视频会自动归入同一项目，可在首页折叠。</p>
                 </div>
               </div>
