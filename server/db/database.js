@@ -67,6 +67,7 @@ function createWork(data) {
     image_aspect_ratio: Number(data.image_aspect_ratio) || null,
     tags: data.tags || [],
     category: data.type === 'video' ? (data.category || '') : '',
+    project: data.type === 'video' ? String(data.project || '').trim() : '',
     hidden: Boolean(data.hidden),
     featured: Boolean(data.featured),
     order: maxOrder + 1,

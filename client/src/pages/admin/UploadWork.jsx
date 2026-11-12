@@ -178,6 +178,7 @@ function UrlImportCard({ onImported }) {
   const [url, setUrl] = useState('');
   const [importType, setImportType] = useState('auto');
   const [category, setCategory] = useState('');
+  const [project, setProject] = useState('');
   const [cover, setCover] = useState(null);
   const [articleContent, setArticleContent] = useState('');
   const [busy, setBusy] = useState(false);
@@ -200,6 +201,7 @@ function UrlImportCard({ onImported }) {
       formData.append('url', url.trim());
       if (importType !== 'auto') formData.append('type', importType);
       if (category.trim()) formData.append('category', category.trim());
+      if (project.trim()) formData.append('project', project.trim());
       if (cover) formData.append('cover', cover);
       if (articleContent.trim()) formData.append('content', articleContent.trim());
 
@@ -215,6 +217,7 @@ function UrlImportCard({ onImported }) {
       setUrl('');
       setImportType('auto');
       setCategory('');
+      setProject('');
       setCover(null);
       setArticleContent('');
       setMessage(`导入成功：${data.work?.title || '新作品'}`);
@@ -252,6 +255,7 @@ function UrlImportCard({ onImported }) {
             <div className="mt-3">
               <p className="mb-2 text-xs font-semibold text-gray-600">视频分类 Tag（可选）</p>
               <VideoCategoryPicker value={category} onChange={setCategory} compact />
+              <input value={project} onChange={(e) => setProject(e.target.value)} className="mt-3 w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="项目组名称（可选）" />
             </div>
           )}
           <input
@@ -303,6 +307,7 @@ export default function UploadWork() {
   const [content, setContent] = useState('');
   const [tags, setTags] = useState('');
   const [category, setCategory] = useState('');
+  const [project, setProject] = useState('');
   const [file, setFile] = useState(null);
   const [batchFiles, setBatchFiles] = useState([]);
   const [cover, setCover] = useState(null);
@@ -341,6 +346,7 @@ export default function UploadWork() {
                 content,
                 tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
                 category: category.trim(),
+                project: project.trim(),
                 videoAspectRatio,
               },
               onProgress: (uploadProgress) => {
@@ -414,6 +420,7 @@ export default function UploadWork() {
       formData.append('content', content);
       formData.append('tags', JSON.stringify(tags.split(',').map((tag) => tag.trim()).filter(Boolean)));
       formData.append('category', type === 'video' ? category.trim() : '');
+      formData.append('project', type === 'video' ? project.trim() : '');
       if (file) formData.append(type === 'video' ? 'video' : type === 'image' ? 'image' : 'document', file);
       let coverToUpload = cover;
       if (type === 'video' && !cover) {
@@ -433,6 +440,7 @@ export default function UploadWork() {
             content,
             tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
             category: category.trim(),
+            project: project.trim(),
             videoAspectRatio,
           },
           onProgress: (p) => {
@@ -566,10 +574,17 @@ export default function UploadWork() {
             </div>
 
             {type === 'video' && (
-              <div>
+              <div className="space-y-4">
+                <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">视频分类 Tag（可选）</label>
                 <VideoCategoryPicker value={category} onChange={setCategory} />
                 <p className="mt-2 text-xs text-gray-500">选择后，作品会进入前台“视频”下对应的分栏；再次点击可取消。</p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">项目组（可选）</label>
+                  <input value={project} onChange={(e) => setProject(e.target.value)} className={inputClass} placeholder="例如：澳门大奖赛" />
+                  <p className="mt-2 text-xs text-gray-500">同名视频会自动归入同一项目，可在首页折叠。</p>
+                </div>
               </div>
             )}
 

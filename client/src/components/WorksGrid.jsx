@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getWorks, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updateWorkCategory, uploadWorkWithProgress } from '../api';
+import { getWorks, renameVideoProject, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updateWorkCategory, uploadWorkWithProgress } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 import { VIDEO_CATEGORIES } from '../utils/video-categories';
@@ -9,6 +9,7 @@ import { moveSelectedWorksToBottom } from '../utils/work-order';
 import { FALLBACK_LINK_TEXT, FEISHU_WORKS_HELP_URL } from '../utils/work-description';
 import { track } from '../analytics';
 import { shouldTrackBackgroundImpression } from '../utils/analytics-policy';
+import { groupVideoProjects, UNGROUPED_PROJECT } from '../utils/video-projects';
 
 const DISPLAY_TITLE_FONT = "'CCY Title Serif', 'Noto Serif SC', serif";
 const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
@@ -153,6 +154,10 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
   const [coverBusyId, setCoverBusyId] = useState('');
   const [videoDurations, setVideoDurations] = useState({});
   const [measuredImageRatios, setMeasuredImageRatios] = useState({});
+  const [collapsedProjects, setCollapsedProjects] = useState([]);
+  const [editingProject, setEditingProject] = useState('');
+  const [projectDraft, setProjectDraft] = useState('');
+  const [projectBusy, setProjectBusy] = useState('');
   const acc = t?.accentColor || '#ff6600';
   const isLoggedIn = Boolean(user);
   const canArrange = isLoggedIn && arrangeMode;
@@ -211,6 +216,19 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
   }, [filter, measuredImageRatios, visibleWorks]);
 
   const displayWorks = useMemo(() => {
+    if (filter === 'video' && videoCategory) {
+      const collapsed = new Set(collapsedProjects);
+      return groupVideoProjects(visibleWorks).flatMap((group) => [
+        {
+          __section: 'project',
+          id: `__project-${videoCategory}-${group.name}`,
+          projectName: group.name,
+          count: group.works.length,
+          collapsed: collapsed.has(group.name),
+        },
+        ...(collapsed.has(group.name) ? [] : group.works),
+      ]);
+    }
     if (filter !== 'image') return visibleWorks;
     const groups = splitImageWorksByOrientation(visibleWorks, measuredImageRatios);
     const items = [];
@@ -221,7 +239,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
       items.push({ __section: 'portrait', id: '__portrait' }, ...groups.portrait);
     }
     return items;
-  }, [filter, measuredImageRatios, visibleWorks]);
+  }, [collapsedProjects, filter, measuredImageRatios, videoCategory, visibleWorks]);
 
   useEffect(() => {
     if (hasOpenWork) return undefined;
@@ -380,6 +398,47 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
       alert(err.message || '保存视频分类失败');
     } finally {
       setCategoryBusyId('');
+    }
+  }
+
+  function toggleProject(projectName) {
+    if (editingProject === projectName) return;
+    setCollapsedProjects((current) => (
+      current.includes(projectName)
+        ? current.filter((name) => name !== projectName)
+        : [...current, projectName]
+    ));
+  }
+
+  function startProjectRename(event, projectName) {
+    event.stopPropagation();
+    if (!isLoggedIn || projectName === UNGROUPED_PROJECT || projectBusy) return;
+    setEditingProject(projectName);
+    setProjectDraft(projectName);
+  }
+
+  async function saveProjectRename(projectName) {
+    const nextProject = projectDraft.trim();
+    if (!nextProject || nextProject === projectName) {
+      setEditingProject('');
+      setProjectDraft('');
+      return;
+    }
+
+    setProjectBusy(projectName);
+    try {
+      const data = await renameVideoProject(videoCategory, projectName, nextProject);
+      const updated = new Map((data.works || []).map((work) => [work.id, work]));
+      setWorks((current) => current.map((work) => updated.get(work.id) || work));
+      setCollapsedProjects((current) => current.map((name) => (
+        name === projectName ? nextProject : name
+      )));
+    } catch (err) {
+      alert(err.message || '项目名称保存失败');
+    } finally {
+      setProjectBusy('');
+      setEditingProject('');
+      setProjectDraft('');
     }
   }
 
@@ -637,7 +696,52 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
-              {displayWorks.map((work) => work.__section ? (
+              {displayWorks.map((work) => work.__section === 'project' ? (
+                <div
+                  key={work.id}
+                  className="col-span-full mt-2 flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50/80 px-5 py-4 transition hover:border-gray-200 hover:bg-gray-50 first:mt-0"
+                  onClick={() => toggleProject(work.projectName)}
+                  title={isLoggedIn && work.projectName !== UNGROUPED_PROJECT ? '单击展开或收起，双击项目名称可重命名' : '单击展开或收起'}
+                >
+                  <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke={acc} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3.5 7.8h6l1.8 2h9.2v7.7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7.8Z" />
+                    <path d="M3.5 7.8V6.5a2 2 0 0 1 2-2h3.4l1.8 2h7.8a2 2 0 0 1 2 2v1.3" />
+                  </svg>
+                  {editingProject === work.projectName ? (
+                    <input
+                      autoFocus
+                      value={projectDraft}
+                      onChange={(event) => setProjectDraft(event.target.value)}
+                      onClick={(event) => event.stopPropagation()}
+                      onDoubleClick={(event) => event.stopPropagation()}
+                      onBlur={() => saveProjectRename(work.projectName)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') event.currentTarget.blur();
+                        if (event.key === 'Escape') {
+                          setEditingProject('');
+                          setProjectDraft('');
+                        }
+                      }}
+                      maxLength={60}
+                      className="min-w-0 flex-1 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-base font-bold text-gray-900 outline-none ring-2 ring-blue-100"
+                      aria-label="项目名称"
+                    />
+                  ) : (
+                    <h3
+                      className="min-w-0 flex-1 truncate text-base font-bold tracking-wide text-gray-800"
+                      onDoubleClick={(event) => startProjectRename(event, work.projectName)}
+                    >
+                      {work.projectName}
+                    </h3>
+                  )}
+                  <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-500 shadow-sm">
+                    {work.count} 个视频
+                  </span>
+                  <svg className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${work.collapsed ? '-rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
+              ) : work.__section ? (
                 <div key={work.id} className="col-span-full mt-2 flex items-center gap-3 first:mt-0">
                   <h3 className="text-sm font-bold tracking-wide text-gray-700">
                     {work.__section === 'portrait' ? '竖屏封面' : '横屏封面'}

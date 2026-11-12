@@ -105,6 +105,20 @@ export function updateWorkCategory(id, category) {
   });
 }
 
+export function updateWorkProject(id, project) {
+  return request(`/works/${id}/project`, {
+    method: 'PATCH',
+    body: JSON.stringify({ project }),
+  });
+}
+
+export function renameVideoProject(category, project, nextProject) {
+  return request('/works/projects/rename', {
+    method: 'PATCH',
+    body: JSON.stringify({ category, project, nextProject }),
+  });
+}
+
 export function getVodUploadSignature() {
   return request('/works/vod-upload-signature', {
     method: 'POST',

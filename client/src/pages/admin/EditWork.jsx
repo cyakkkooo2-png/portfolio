@@ -18,6 +18,7 @@ export default function EditWork() {
   const [content, setContent] = useState('');
   const [tags, setTags] = useState('');
   const [category, setCategory] = useState('');
+  const [project, setProject] = useState('');
   const [file, setFile] = useState(null);
   const [cover, setCover] = useState(null);
   const [existingFile, setExistingFile] = useState('');
@@ -31,7 +32,7 @@ export default function EditWork() {
     getWork(id).then(d => {
       const w = d.work;
       setType(w.type); setTitle(String(w.title || '').trim() || fileNameWithoutExtension(w.file_path)); setDescription(w.description);
-      setContent(w.content); setTags((w.tags || []).join(', ')); setCategory(w.category || '');
+      setContent(w.content); setTags((w.tags || []).join(', ')); setCategory(w.category || ''); setProject(w.project || '');
       setExistingFile(w.file_path); setExistingCover(w.thumbnail);
     }).catch(e => setError(e.message)).finally(() => setLoading(false));
   }, [id]);
@@ -50,6 +51,7 @@ export default function EditWork() {
       fd.append('type', type); fd.append('content', content);
       fd.append('tags', JSON.stringify(tags.split(',').map(t => t.trim()).filter(Boolean)));
       fd.append('category', type === 'video' ? category.trim() : '');
+      fd.append('project', type === 'video' ? project.trim() : '');
       if (file) fd.append(type === 'video' ? 'video' : 'image', file);
       if (cover) fd.append('cover', cover);
 
@@ -128,9 +130,14 @@ export default function EditWork() {
           <input type="text" value={tags} onChange={e => setTags(e.target.value)} className={cls} /></div>
 
         {type === 'video' && (
-          <div><label className="block text-sm font-medium text-gray-700 mb-2">视频分类 Tag</label>
-            <VideoCategoryPicker value={category} onChange={setCategory} />
-            <p className="mt-2 text-xs text-gray-500">选择后会进入前台“视频”下对应分栏。</p></div>
+          <div className="space-y-4">
+            <div><label className="block text-sm font-medium text-gray-700 mb-2">视频分类 Tag</label>
+              <VideoCategoryPicker value={category} onChange={setCategory} />
+              <p className="mt-2 text-xs text-gray-500">选择后会进入前台“视频”下对应分栏。</p></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">项目组（可选）</label>
+              <input type="text" value={project} onChange={(e) => setProject(e.target.value)} className={cls} placeholder="例如：澳门大奖赛" />
+              <p className="mt-2 text-xs text-gray-500">同一名称的视频会归入同一个可折叠项目。</p></div>
+          </div>
         )}
 
         {uploading && progress && <ProgressBar percent={progress.percent} fileName={progress.fileName} speed={progress.speed} />}

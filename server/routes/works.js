@@ -811,6 +811,31 @@ router.patch('/:id/category', authMiddleware, (req, res) => {
   res.json({ work });
 });
 
+router.patch('/projects/rename', authMiddleware, (req, res) => {
+  const category = String(req.body?.category || '').trim();
+  const project = String(req.body?.project || '').trim();
+  const nextProject = String(req.body?.nextProject || '').trim().slice(0, 60);
+  if (!project) return res.status(400).json({ error: '未分组不能直接重命名，请在作品上设置项目组' });
+
+  const matches = db.getWorks().filter((work) => (
+    work.type === 'video'
+    && String(work.category || '').trim() === category
+    && String(work.project || '').trim() === project
+  ));
+  if (!matches.length) return res.status(404).json({ error: '项目不存在' });
+  const works = matches.map((work) => db.updateWork(work.id, { project: nextProject }));
+  res.json({ works });
+});
+
+router.patch('/:id/project', authMiddleware, (req, res) => {
+  const existing = db.getWorkById(req.params.id);
+  if (!existing) return res.status(404).json({ error: '作品不存在' });
+  if (existing.type !== 'video') return res.status(400).json({ error: '只有视频可以设置项目组' });
+  const project = String(req.body?.project || '').trim().slice(0, 60);
+  const work = db.updateWork(req.params.id, { project });
+  res.json({ work });
+});
+
 router.delete('/cleanup-local-videos', authMiddleware, (req, res) => {
   try {
     const videosDir = path.join(UPLOADS_DIR, 'videos');
@@ -1091,7 +1116,7 @@ router.post('/vod-upload-signature', authMiddleware, (req, res) => {
 router.post('/vod-complete', authMiddleware, async (req, res) => {
   try {
     const {
-      title, description, content, tags, category,
+      title, description, content, tags, category, project,
       fileUrl, coverUrl, fileId, fileSize, originalName, videoAspectRatio,
     } = req.body || {};
     const resolvedTitle = String(title || '').trim() || fileNameWithoutExtension(originalName);
@@ -1117,6 +1142,7 @@ router.post('/vod-complete', authMiddleware, async (req, res) => {
       vod_transcode_profile: 'single-6000',
       tags: parsedTags,
       category: String(category || '').trim().slice(0, 40),
+      project: String(project || '').trim().slice(0, 60),
       file_size: Number(fileSize) || null,
       video_aspect_ratio: Number(videoAspectRatio) || null,
     });
@@ -1152,7 +1178,7 @@ router.post('/', authMiddleware, upload.fields([
   { name: 'image', maxCount: 1 }, { name: 'video', maxCount: 1 }, { name: 'document', maxCount: 1 }, { name: 'cover', maxCount: 1 },
 ]), async (req, res) => {
   try {
-    const { title, description, type, content, tags, category, imageAspectRatio } = req.body;
+    const { title, description, type, content, tags, category, project, imageAspectRatio } = req.body;
     if (!type) return res.status(400).json({ error: '类型为必填项' });
     if (!['video', 'image', 'article'].includes(type)) return res.status(400).json({ error: '无效的类型' });
 
@@ -1200,6 +1226,7 @@ router.post('/', authMiddleware, upload.fields([
       vod_file_id: vodFileId,
       tags: typeof tags === 'string' ? JSON.parse(tags) : (tags || []),
       category: type === 'video' ? String(category || '').trim().slice(0, 40) : '',
+      project: type === 'video' ? String(project || '').trim().slice(0, 60) : '',
       file_size: totalFileSize || null,
       image_aspect_ratio: type === 'image' ? Number(imageAspectRatio) || null : null,
     });
@@ -1218,7 +1245,7 @@ router.post('/import-url', authMiddleware, upload.fields([
   { name: 'cover', maxCount: 1 },
 ]), async (req, res) => {
   try {
-    const { url, type, content, category } = req.body || {};
+    const { url, type, content, category, project } = req.body || {};
     if (!url) return res.status(400).json({ error: '请输入网页链接' });
     if (type === 'article' && !req.files?.cover?.[0]) {
       return res.status(400).json({ error: '文章链接需要上传封面' });
@@ -1226,6 +1253,7 @@ router.post('/import-url', authMiddleware, upload.fields([
 
     const data = await extractFromUrl(url, { type, content });
     data.category = data.type === 'video' ? String(category || '').trim().slice(0, 40) : '';
+    data.project = data.type === 'video' ? String(project || '').trim().slice(0, 60) : '';
     if (rejectDuplicate(res, findDuplicateWork({
       title: data.title,
       type: data.type,
@@ -1264,6 +1292,10 @@ router.put('/:id', authMiddleware, upload.fields([
     if (req.body.category !== undefined) {
       const nextType = req.body.type || existing.type;
       updateData.category = nextType === 'video' ? String(req.body.category || '').trim().slice(0, 40) : '';
+    }
+    if (req.body.project !== undefined) {
+      const nextType = req.body.type || existing.type;
+      updateData.project = nextType === 'video' ? String(req.body.project || '').trim().slice(0, 60) : '';
     }
 
     const incomingFile = req.files?.video?.[0] || req.files?.image?.[0] || req.files?.document?.[0];

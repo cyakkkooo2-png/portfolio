@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { getWorks, deleteWork, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updateWorkCategory } from '../../api';
+import { getWorks, deleteWork, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updateWorkCategory, updateWorkProject } from '../../api';
 import { VIDEO_CATEGORIES } from '../../utils/video-categories';
 
 function formatBytes(bytes) {
@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [batchMessage, setBatchMessage] = useState(null);
   const [featuredBusyId, setFeaturedBusyId] = useState('');
   const [categoryBusyId, setCategoryBusyId] = useState('');
+  const [projectBusyId, setProjectBusyId] = useState('');
   const location = useLocation();
 
   useEffect(() => {
@@ -145,6 +146,21 @@ export default function Dashboard() {
       setBatchMessage({ type: 'error', text: err.message || '保存视频分类失败' });
     } finally {
       setCategoryBusyId('');
+    }
+  }
+
+  async function handleProjectChange(work, project) {
+    const nextProject = project.trim();
+    if (projectBusyId || nextProject === String(work.project || '').trim()) return;
+    setProjectBusyId(work.id);
+    try {
+      const data = await updateWorkProject(work.id, nextProject);
+      setWorks((current) => current.map((item) => item.id === work.id ? { ...item, ...data.work } : item));
+      setBatchMessage({ type: 'success', text: nextProject ? `已加入项目“${nextProject}”` : '已移出项目组' });
+    } catch (err) {
+      setBatchMessage({ type: 'error', text: err.message || '保存项目组失败' });
+    } finally {
+      setProjectBusyId('');
     }
   }
 
@@ -372,7 +388,7 @@ export default function Dashboard() {
                       </div>
                       <div className="col-span-2">
                         {work.type === 'video' ? (
-                          <select
+                          <div className="space-y-1.5"><select
                             value={work.category || ''}
                             onChange={(event) => handleCategoryChange(work, event.target.value)}
                             disabled={categoryBusyId === work.id}
@@ -384,6 +400,15 @@ export default function Dashboard() {
                               <option key={category} value={category}>{category}</option>
                             ))}
                           </select>
+                          <input
+                            defaultValue={work.project || ''}
+                            onBlur={(event) => handleProjectChange(work, event.target.value)}
+                            onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+                            disabled={projectBusyId === work.id}
+                            aria-label={`${work.title}的项目组`}
+                            className="block w-full max-w-36 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 outline-none focus:border-blue-400 disabled:opacity-60"
+                            placeholder="项目组"
+                          /></div>
                         ) : (
                           <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
                             {work.type === 'image' ? '图片' : '文章'}
