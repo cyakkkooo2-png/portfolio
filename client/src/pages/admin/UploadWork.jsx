@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { uploadVideoDirectToVod, uploadWorkWithProgress } from '../../api';
 import ProgressBar from '../../components/ProgressBar';
 import StorageBar from '../../components/StorageBar';
 import { useAuth } from '../../context/AuthContext';
 import VideoCategoryPicker from '../../components/VideoCategoryPicker';
-import { batchTitleForFile, isDuplicateUploadError, shouldBatchUpload } from '../../utils/batch-upload';
+import { batchTitleForFile, isDuplicateUploadError, selectVideoFiles, shouldBatchUpload } from '../../utils/batch-upload';
+import { captureVideoCover } from '../../utils/video-cover';
 
 const TYPES = [
   { key: 'video', label: '视频', icon: '🎬' },
@@ -63,63 +64,6 @@ function readImageAspectRatio(imageFile) {
       reject(new Error('浏览器无法读取图片比例'));
     };
     image.src = objectUrl;
-  });
-}
-
-// Create a lightweight JPEG cover in the browser. This keeps the server from
-// having to decode video files (which is expensive on Railway's small plans).
-function captureVideoCover(videoFile) {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video');
-    const objectUrl = URL.createObjectURL(videoFile);
-    const cleanup = () => {
-      video.removeAttribute('src');
-      video.load();
-      URL.revokeObjectURL(objectUrl);
-    };
-
-    video.preload = 'metadata';
-    video.muted = true;
-    video.playsInline = true;
-
-    video.onloadedmetadata = () => {
-      // Avoid the first frame, which is often black. For very short clips,
-      // use the middle of the available duration instead.
-      const duration = Number.isFinite(video.duration) ? video.duration : 1;
-      video.currentTime = Math.min(1, Math.max(0.05, duration * 0.1));
-    };
-
-    video.onseeked = () => {
-      const sourceWidth = video.videoWidth;
-      const sourceHeight = video.videoHeight;
-      if (!sourceWidth || !sourceHeight) {
-        cleanup();
-        reject(new Error('视频没有可用画面，无法自动生成封面'));
-        return;
-      }
-
-      const maxWidth = 1280;
-      const scale = Math.min(1, maxWidth / sourceWidth);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(sourceWidth * scale);
-      canvas.height = Math.round(sourceHeight * scale);
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => {
-        cleanup();
-        if (!blob) {
-          reject(new Error('自动生成视频封面失败，请手动上传封面'));
-          return;
-        }
-        const stem = videoFile.name.replace(/\.[^/.]+$/, '') || 'video-cover';
-        resolve(new File([blob], `${stem}-cover.jpg`, { type: 'image/jpeg' }));
-      }, 'image/jpeg', 0.86);
-    };
-
-    video.onerror = () => {
-      cleanup();
-      reject(new Error('浏览器无法读取该视频，请手动上传封面'));
-    };
-    video.src = objectUrl;
   });
 }
 
@@ -314,6 +258,24 @@ export default function UploadWork() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(null);
+
+  const [draggingVideo, setDraggingVideo] = useState(false);
+  const videoDragDepth = useRef(0);
+
+  function selectFiles(files) {
+    if (uploading) return;
+    const incoming = Array.from(files || []);
+    const selected = type === 'video' ? selectVideoFiles(incoming) : incoming;
+    if (type === 'video' && incoming.length && !selected.length) {
+      setError('请拖入视频文件，支持 MP4、MOV、WebM 等格式');
+      return;
+    }
+    setError(selected.length < incoming.length ? '已忽略非视频文件，其余视频已加入待上传列表。' : '');
+    setFile(selected[0] || null);
+    setBatchFiles(type === 'video' || type === 'image' ? selected : []);
+    if (selected.length > 1) setTitle('');
+    else if (selected.length === 1 && !title.trim()) setTitle(fileNameWithoutExtension(selected[0].name));
+  }
 
   async function handleBatchUpload() {
     setUploading(true);
@@ -527,7 +489,7 @@ export default function UploadWork() {
           <label className="mb-2 block text-sm font-medium text-gray-700">类型</label>
           <div className="mb-5 flex gap-3">
             {TYPES.map((item) => (
-              <button key={item.key} type="button" onClick={() => { setType(item.key); setFile(null); setBatchFiles([]); }} className={`rounded-lg border px-5 py-2 text-sm font-semibold transition ${type === item.key ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}>
+              <button key={item.key} type="button" disabled={uploading} onClick={() => { setType(item.key); setFile(null); setBatchFiles([]); setDraggingVideo(false); videoDragDepth.current = 0; }} className={`rounded-lg border px-5 py-2 text-sm font-semibold transition ${type === item.key ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}>
                 {item.icon} {item.label}
               </button>
             ))}
@@ -549,21 +511,50 @@ export default function UploadWork() {
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">{type === 'video' ? '视频文件 *' : type === 'image' ? '图片文件 *' : '文章文档 *'}</label>
                 <p className="mb-2 text-xs text-gray-500">{type === 'article' ? '支持 PDF、Word、TXT 或 Markdown 文档；正文会作为文档保存在作品中。' : ''}</p>
-                <input type="file" multiple={type === 'video' || type === 'image'} accept={type === 'video' ? 'video/*' : type === 'image' ? 'image/*' : '.pdf,.doc,.docx,.txt,.md'} onChange={(e) => {
-                  const selected = Array.from(e.target.files || []);
-                  setFile(selected[0] || null);
-                  setBatchFiles(type === 'video' || type === 'image' ? selected : []);
-                  if (selected.length > 1) setTitle('');
-                  else if (selected.length === 1 && !title.trim()) setTitle(fileNameWithoutExtension(selected[0].name));
-                }} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
-                {(type === 'video' || type === 'image') && <p className="mt-1 text-xs text-gray-500">可按住 Ctrl 或 Shift 一次选择多个{type === 'video' ? '视频' : '图片'}；系统会按顺序上传。</p>}
+                {type === 'video' ? (
+                  <label
+                    className={`block rounded-lg border-2 border-dashed p-5 text-center transition focus-within:ring-2 focus-within:ring-blue-200 ${uploading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${draggingVideo ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50/50 hover:border-blue-300'}`}
+                    onDragEnter={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (uploading || !Array.from(event.dataTransfer.types).includes('Files')) return;
+                      videoDragDepth.current += 1;
+                      setDraggingVideo(true);
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      event.dataTransfer.dropEffect = uploading ? 'none' : 'copy';
+                    }}
+                    onDragLeave={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      videoDragDepth.current = Math.max(0, videoDragDepth.current - 1);
+                      if (!videoDragDepth.current) setDraggingVideo(false);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      videoDragDepth.current = 0;
+                      setDraggingVideo(false);
+                      if (event.dataTransfer.files.length) selectFiles(event.dataTransfer.files);
+                    }}
+                  >
+                    <input type="file" multiple accept="video/*,.mp4,.mov,.webm,.avi,.mkv,.m4v" disabled={uploading} className="sr-only" aria-label="选择或拖入视频文件" onChange={(event) => { selectFiles(event.target.files); event.target.value = ''; }} />
+                    <span className="block text-sm font-semibold text-gray-700">{draggingVideo ? '松开即可添加视频' : '把视频拖到这里，或点击选择文件'}</span>
+                    <span className="mt-1 block text-xs text-gray-500">支持单个或多个视频，选择完成后点击“上传作品”</span>
+                    <span className="mt-3 inline-block rounded-lg bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">选择文件</span>
+                  </label>
+                ) : <input type="file" multiple={type === 'image'} accept={type === 'image' ? 'image/*' : '.pdf,.doc,.docx,.txt,.md'} disabled={uploading} onChange={(event) => selectFiles(event.target.files)} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />}
+                {(type === 'video' || type === 'image') && <p className="mt-1 text-xs text-gray-500">{type === 'video' ? '可一次拖入多个视频，也可按住 Ctrl 或 Shift 多选；系统会按顺序上传。' : '可按住 Ctrl 或 Shift 一次选择多个图片；系统会按顺序上传。'}</p>}
                 {batchFiles.length > 1 ? <p className="mt-1 text-xs font-medium text-blue-600">已选择 {batchFiles.length} 个{type === 'video' ? '视频' : '图片'}，将自动以文件名作为标题。</p> : file && <p className="mt-1 text-xs text-gray-500">{file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</p>}
+                {type === 'video' && batchFiles.length > 1 && <ul className="mt-2 max-h-32 overflow-y-auto text-xs text-gray-500" aria-label="待上传视频列表">{batchFiles.map((item, index) => <li key={`${item.name}-${index}`} className="truncate py-0.5">{index + 1}. {item.name}</li>)}</ul>}
               </div>
             )}
 
             {!(type === 'image' && batchFiles.length > 1) && <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">封面图（可选）</label>
-              {type === 'video' && <p className="mb-2 text-xs text-gray-500">未上传封面时，会自动截取视频约第 1 秒的画面作为封面。</p>}
+              {type === 'video' && <p className="mb-2 text-xs text-gray-500">未上传封面时，会从第 1 秒开始截图；如果是黑屏，会继续向后查找第一个有画面的帧作为封面。</p>}
               <input type="file" accept="image/*" onChange={(e) => setCover(e.target.files?.[0] || null)} className="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
             </div>}
 
