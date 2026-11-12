@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getWorks, renameVideoProject, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updateWorkCategory, uploadWorkWithProgress } from '../api';
+import { getWorks, renameVideoProject, reorderWorks, toggleWorkFeatured, toggleWorkVisibility, updateWorkCategory, updateWorkProject, uploadWorkWithProgress } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { RichText, txt, useTheme } from '../context/ThemeContext';
 import { VIDEO_CATEGORIES } from '../utils/video-categories';
@@ -158,6 +158,10 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
   const [editingProject, setEditingProject] = useState('');
   const [projectDraft, setProjectDraft] = useState('');
   const [projectBusy, setProjectBusy] = useState('');
+  const [projectBusyId, setProjectBusyId] = useState('');
+  const [customProjects, setCustomProjects] = useState({});
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
   const acc = t?.accentColor || '#ff6600';
   const isLoggedIn = Boolean(user);
   const canArrange = isLoggedIn && arrangeMode;
@@ -218,7 +222,12 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
   const displayWorks = useMemo(() => {
     if (filter === 'video' && videoCategory) {
       const collapsed = new Set(collapsedProjects);
-      return groupVideoProjects(visibleWorks).flatMap((group) => [
+      const groups = groupVideoProjects(visibleWorks);
+      const known = new Set(groups.map((group) => group.name));
+      (customProjects[videoCategory] || []).forEach((name) => {
+        if (name && !known.has(name)) groups.push({ name, works: [] });
+      });
+      return groups.flatMap((group) => [
         {
           __section: 'project',
           id: `__project-${videoCategory}-${group.name}`,
@@ -239,7 +248,17 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
       items.push({ __section: 'portrait', id: '__portrait' }, ...groups.portrait);
     }
     return items;
-  }, [collapsedProjects, filter, measuredImageRatios, videoCategory, visibleWorks]);
+  }, [collapsedProjects, customProjects, filter, measuredImageRatios, videoCategory, visibleWorks]);
+
+  const projectOptions = useMemo(() => {
+    const names = new Set(customProjects[videoCategory] || []);
+    works.forEach((work) => {
+      if (work.type !== 'video' || work.category !== videoCategory) return;
+      const name = String(work.project || '').trim();
+      if (name) names.add(name);
+    });
+    return [...names];
+  }, [customProjects, videoCategory, works]);
 
   useEffect(() => {
     if (hasOpenWork) return undefined;
@@ -401,6 +420,42 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
     }
   }
 
+  async function handleProjectChange(event, work) {
+    event.stopPropagation();
+    const project = event.target.value;
+    if (projectBusyId || project === String(work.project || '').trim()) return;
+    const previousWorks = works;
+    setProjectBusyId(work.id);
+    setWorks((current) => current.map((item) => (
+      item.id === work.id ? { ...item, project } : item
+    )));
+    try {
+      const data = await updateWorkProject(work.id, project);
+      if (data.work) {
+        setWorks((current) => current.map((item) => (
+          item.id === work.id ? { ...item, ...data.work } : item
+        )));
+      }
+    } catch (err) {
+      setWorks(previousWorks);
+      alert(err.message || '移动视频失败');
+    } finally {
+      setProjectBusyId('');
+    }
+  }
+
+  function addProject() {
+    const name = newProjectName.trim();
+    if (!name || !videoCategory) return;
+    setCustomProjects((current) => ({
+      ...current,
+      [videoCategory]: [...new Set([...(current[videoCategory] || []), name])],
+    }));
+    setCollapsedProjects((current) => current.filter((item) => item !== name));
+    setNewProjectName('');
+    setCreatingProject(false);
+  }
+
   function toggleProject(projectName) {
     if (editingProject === projectName) return;
     setCollapsedProjects((current) => (
@@ -412,9 +467,9 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
 
   function startProjectRename(event, projectName) {
     event.stopPropagation();
-    if (!isLoggedIn || projectName === UNGROUPED_PROJECT || projectBusy) return;
+    if (!isLoggedIn || projectBusy) return;
     setEditingProject(projectName);
-    setProjectDraft(projectName);
+    setProjectDraft(projectName === UNGROUPED_PROJECT ? '' : projectName);
   }
 
   async function saveProjectRename(projectName) {
@@ -427,7 +482,20 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
 
     setProjectBusy(projectName);
     try {
-      const data = await renameVideoProject(videoCategory, projectName, nextProject);
+      const sourceProject = projectName === UNGROUPED_PROJECT ? '' : projectName;
+      const groupHasWorks = visibleWorks.some((work) => (
+        (String(work.project || '').trim() || UNGROUPED_PROJECT) === projectName
+      ));
+      if (!groupHasWorks) {
+        setCustomProjects((current) => ({
+          ...current,
+          [videoCategory]: (current[videoCategory] || []).map((name) => (
+            name === projectName ? nextProject : name
+          )),
+        }));
+        return;
+      }
+      const data = await renameVideoProject(videoCategory, sourceProject, nextProject);
       const updated = new Map((data.works || []).map((work) => [work.id, work]));
       setWorks((current) => current.map((work) => updated.get(work.id) || work));
       setCollapsedProjects((current) => current.map((name) => (
@@ -663,6 +731,40 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                 {category}
               </button>
             ))}
+            {isLoggedIn && videoCategory && (
+              creatingProject ? (
+                <div className="ml-2 inline-flex items-center gap-1 rounded-full border border-orange-200 bg-white p-1 shadow-sm">
+                  <input
+                    autoFocus
+                    value={newProjectName}
+                    onChange={(event) => setNewProjectName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') addProject();
+                      if (event.key === 'Escape') {
+                        setCreatingProject(false);
+                        setNewProjectName('');
+                      }
+                    }}
+                    className="w-32 bg-transparent px-2 text-xs font-semibold text-gray-700 outline-none"
+                    placeholder="输入分组名称"
+                    maxLength={60}
+                    aria-label="新分组名称"
+                  />
+                  <button type="button" onClick={addProject} className="rounded-full bg-orange-500 px-2.5 py-1 text-xs font-bold text-white">确定</button>
+                  <button
+                    type="button"
+                    onClick={() => { setCreatingProject(false); setNewProjectName(''); }}
+                    className="rounded-full px-2 py-1 text-xs font-bold text-gray-400"
+                  >取消</button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCreatingProject(true)}
+                  className="ml-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-600 transition hover:bg-orange-100"
+                >＋ 添加分组</button>
+              )
+            )}
           </div>
         )}
 
@@ -672,7 +774,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
               href={FEISHU_WORKS_HELP_URL}
               target="_blank"
               rel="noreferrer"
-              className="pointer-events-auto sticky top-28 inline-flex rounded-full px-3 py-4 text-sm font-bold leading-5 no-underline backdrop-blur-sm transition duration-200 hover:-translate-y-0.5 hover:brightness-125"
+              className="pointer-events-auto fixed left-6 top-1/2 z-30 inline-flex -translate-y-1/2 rounded-full px-3 py-4 text-sm font-bold leading-5 no-underline backdrop-blur-sm transition duration-200 hover:brightness-125"
               style={{
                 color: '#EDB79C',
                 background: 'linear-gradient(180deg, #0C567D, #084461)',
@@ -699,11 +801,11 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
               {displayWorks.map((work) => work.__section === 'project' ? (
                 <div
                   key={work.id}
-                  className="col-span-full mt-2 flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50/80 px-5 py-4 transition hover:border-gray-200 hover:bg-gray-50 first:mt-0"
+                  className="col-span-full mt-1 flex cursor-pointer items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-2 transition hover:border-gray-200 hover:bg-gray-50 first:mt-0"
                   onClick={() => toggleProject(work.projectName)}
-                  title={isLoggedIn && work.projectName !== UNGROUPED_PROJECT ? '单击展开或收起，双击项目名称可重命名' : '单击展开或收起'}
+                  title={isLoggedIn ? '单击空白处展开或收起，双击项目名称可重命名' : '单击展开或收起'}
                 >
-                  <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke={acc} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke={acc} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M3.5 7.8h6l1.8 2h9.2v7.7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7.8Z" />
                     <path d="M3.5 7.8V6.5a2 2 0 0 1 2-2h3.4l1.8 2h7.8a2 2 0 0 1 2 2v1.3" />
                   </svg>
@@ -723,18 +825,19 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                         }
                       }}
                       maxLength={60}
-                      className="min-w-0 flex-1 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-base font-bold text-gray-900 outline-none ring-2 ring-blue-100"
+                      className="min-w-0 flex-1 rounded-md border border-blue-300 bg-white px-2.5 py-1 text-sm font-bold text-gray-900 outline-none ring-2 ring-blue-100"
                       aria-label="项目名称"
                     />
                   ) : (
                     <h3
-                      className="min-w-0 flex-1 truncate text-base font-bold tracking-wide text-gray-800"
+                      className="min-w-0 flex-1 truncate text-sm font-bold tracking-wide text-gray-800"
+                      onClick={(event) => event.stopPropagation()}
                       onDoubleClick={(event) => startProjectRename(event, work.projectName)}
                     >
                       {work.projectName}
                     </h3>
                   )}
-                  <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-500 shadow-sm">
+                  <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-gray-500 shadow-sm">
                     {work.count} 个视频
                   </span>
                   <svg className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${work.collapsed ? '-rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -875,7 +978,6 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                         display: '-webkit-box',
                         WebkitBoxOrient: 'vertical',
                         WebkitLineClamp: 2,
-                        paddingRight: isLoggedIn && !canArrange && work.type === 'video' ? '7.75rem' : undefined,
                         fontFamily: WORK_CARD_TITLE_FONT,
                         color: '#061827',
                       }}
@@ -883,20 +985,34 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                       {work.title}
                     </h3>
                     {isLoggedIn && !canArrange && work.type === 'video' && (
-                      <select
-                        value={work.category || ''}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => handleCategoryChange(event, work)}
-                        disabled={categoryBusyId === work.id}
-                        aria-label={`${work.title}的视频分类`}
-                        className="absolute bottom-[7px] right-1 z-20 w-28 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-gray-600 shadow-sm outline-none transition hover:border-orange-300 disabled:cursor-wait disabled:opacity-60"
-                        title="直接设置视频分类"
-                      >
-                        <option value="">分类</option>
-                        {VIDEO_CATEGORIES.map((category) => (
-                          <option key={category} value={category}>{category}</option>
-                        ))}
-                      </select>
+                      <div className="mt-2 flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
+                        <select
+                          value={work.category || ''}
+                          onChange={(event) => handleCategoryChange(event, work)}
+                          disabled={categoryBusyId === work.id}
+                          aria-label={`${work.title}的视频分类`}
+                          className="w-24 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-gray-600 shadow-sm outline-none transition hover:border-orange-300 disabled:cursor-wait disabled:opacity-60"
+                          title="直接设置视频分类"
+                        >
+                          <option value="">分类</option>
+                          {VIDEO_CATEGORIES.map((category) => (
+                            <option key={category} value={category}>{category}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={String(work.project || '').trim()}
+                          onChange={(event) => handleProjectChange(event, work)}
+                          disabled={projectBusyId === work.id}
+                          aria-label={`${work.title}的项目分组`}
+                          className="w-32 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-bold text-gray-600 shadow-sm outline-none transition hover:border-blue-300 disabled:cursor-wait disabled:opacity-60"
+                          title="把视频移动到项目分组"
+                        >
+                          <option value="">未分组</option>
+                          {projectOptions.map((project) => (
+                            <option key={project} value={project}>{project}</option>
+                          ))}
+                        </select>
+                      </div>
                     )}
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-400">
                       {work.hidden && (

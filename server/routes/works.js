@@ -815,7 +815,7 @@ router.patch('/projects/rename', authMiddleware, (req, res) => {
   const category = String(req.body?.category || '').trim();
   const project = String(req.body?.project || '').trim();
   const nextProject = String(req.body?.nextProject || '').trim().slice(0, 60);
-  if (!project) return res.status(400).json({ error: '未分组不能直接重命名，请在作品上设置项目组' });
+  if (!nextProject) return res.status(400).json({ error: '项目名称不能为空' });
 
   const matches = db.getWorks().filter((work) => (
     work.type === 'video'
