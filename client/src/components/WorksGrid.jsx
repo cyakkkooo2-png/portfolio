@@ -730,7 +730,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                 key={item.k}
                 onClick={() => {
                   setFilter(item.k);
-                  setVideoCategory('');
+                  setVideoCategory(item.k === 'video' ? 'AI' : '');
                   setSelectedMoveId('');
                 }}
                 className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition-all"
