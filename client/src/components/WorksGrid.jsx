@@ -17,10 +17,10 @@ const WORK_CARD_TITLE_FONT = "'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaH
 
 const FILTERS = [
   { k: 'featured', l: '精选', icon: 'spark' },
-  { k: 'all', l: '全部', icon: 'grid' },
   { k: 'video', l: '视频', icon: 'video' },
-  { k: 'image', l: '图片', icon: 'image' },
   { k: 'article', l: '文章', icon: 'article' },
+  { k: 'image', l: '图片', icon: 'image' },
+  { k: 'all', l: '全部', icon: 'grid' },
 ];
 
 function isTencentVodUrl(url = '') {
@@ -183,7 +183,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
   }, []);
 
   const visibleWorks = useMemo(() => {
-    let list = works;
+    let list = canEdit ? works : works.filter((work) => !work.hidden);
     if (filter === 'featured') list = list.filter((work) => work.featured);
     if (filter === 'video') list = list.filter((work) => work.type === 'video');
     if (filter === 'image') list = list.filter((work) => work.type === 'image');
@@ -198,7 +198,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
       ];
     }
     return list;
-  }, [filter, videoCategory, works]);
+  }, [canEdit, filter, videoCategory, works]);
 
   useEffect(() => {
     if (filter !== 'image') return undefined;
@@ -227,7 +227,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
       const collapsed = new Set(collapsedProjects);
       const groups = groupVideoProjects(visibleWorks);
       const known = new Set(groups.map((group) => group.name));
-      (customProjects[videoCategory] || []).forEach((name) => {
+      (canEdit ? customProjects[videoCategory] || [] : []).forEach((name) => {
         if (name && !known.has(name)) groups.push({ name, works: [] });
       });
       return groups.flatMap((group) => [
@@ -251,7 +251,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
       items.push({ __section: 'portrait', id: '__portrait' }, ...groups.portrait);
     }
     return items;
-  }, [collapsedProjects, customProjects, filter, measuredImageRatios, videoCategory, visibleWorks]);
+  }, [canEdit, collapsedProjects, customProjects, filter, measuredImageRatios, videoCategory, visibleWorks]);
 
   const projectOptions = useMemo(() => {
     const names = new Set(customProjects[videoCategory] || []);
@@ -748,13 +748,6 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
         {filter === 'video' && (
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
             <span className="mr-1 text-xs font-semibold uppercase tracking-wider" style={{ color: '#a0a6b3' }}>分组</span>
-            <button
-              onClick={() => setVideoCategory('')}
-              className="rounded-full px-3 py-1.5 text-xs font-semibold transition"
-              style={!videoCategory ? { background: '#1d2333', color: '#fff' } : { background: '#f1f3f7', color: '#6e7685' }}
-            >
-              全部视频
-            </button>
             {VIDEO_CATEGORIES.map((category) => (
               <button
                 key={category}
@@ -765,6 +758,13 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                 {category}
               </button>
             ))}
+            <button
+              onClick={() => setVideoCategory('')}
+              className="rounded-full px-3 py-1.5 text-xs font-semibold transition"
+              style={!videoCategory ? { background: '#1d2333', color: '#fff' } : { background: '#f1f3f7', color: '#6e7685' }}
+            >
+              全部视频
+            </button>
             {canEdit && videoCategory && (
               creatingProject ? (
                 <div className="ml-2 inline-flex items-center gap-1 rounded-full border border-orange-200 bg-white p-1 shadow-sm">
