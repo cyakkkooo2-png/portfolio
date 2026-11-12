@@ -148,6 +148,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
   const [savingOrder, setSavingOrder] = useState(false);
   const [selectedMoveId, setSelectedMoveId] = useState('');
   const [arrangeMode, setArrangeMode] = useState(false);
+  const [editMode, setEditMode] = useState(true);
   const [selectedWorkIds, setSelectedWorkIds] = useState([]);
   const [batchSaving, setBatchSaving] = useState(false);
   const [featuredBusyId, setFeaturedBusyId] = useState('');
@@ -165,7 +166,8 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
   const [newProjectName, setNewProjectName] = useState('');
   const acc = t?.accentColor || '#ff6600';
   const isLoggedIn = Boolean(user);
-  const canArrange = isLoggedIn && arrangeMode;
+  const canEdit = isLoggedIn && editMode;
+  const canArrange = canEdit && arrangeMode;
   const selectedWorkSet = useMemo(() => new Set(selectedWorkIds), [selectedWorkIds]);
 
   function rememberVideoDuration(workId, duration) {
@@ -468,7 +470,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
 
   function startProjectRename(event, projectName) {
     event.stopPropagation();
-    if (!isLoggedIn || projectBusy) return;
+    if (!canEdit || projectBusy) return;
     setEditingProject(projectName);
     setProjectDraft(projectName === UNGROUPED_PROJECT ? '' : projectName);
   }
@@ -616,6 +618,20 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
           </h2>
           <RichText as="p" value={t?.worksSubtitle} fallback="Selected works across video, image and writing" className="mt-4 text-base font-medium" style={{ color: '#a0a6b3' }} />
           {isLoggedIn && (
+            <div className="mt-5 flex items-center justify-center">
+              <button type="button" aria-pressed={editMode} disabled={Boolean(savingOrder || batchSaving || coverBusyId || categoryBusyId || projectBusy || projectBusyId || featuredBusyId)} onClick={() => {
+                setEditMode((value) => !value);
+                setArrangeMode(false);
+                setSelectedMoveId('');
+                setSelectedWorkIds([]);
+                setEditingProject('');
+                setCreatingProject(false);
+              }} className="rounded-full px-4 py-2 text-xs font-semibold transition disabled:opacity-50" style={editMode ? { background: acc, color: '#fff' } : { background: '#f7f8fb', color: '#6b7280' }}>
+                {editMode ? '退出编辑模式' : '进入编辑模式'}
+              </button>
+            </div>
+          )}
+          {canEdit && (
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
@@ -749,7 +765,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                 {category}
               </button>
             ))}
-            {isLoggedIn && videoCategory && (
+            {canEdit && videoCategory && (
               creatingProject ? (
                 <div className="ml-2 inline-flex items-center gap-1 rounded-full border border-orange-200 bg-white p-1 shadow-sm">
                   <input
@@ -821,7 +837,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                   key={work.id}
                   className="col-span-full mt-1 flex cursor-pointer items-center gap-2 px-1 py-2 first:mt-0"
                   onClick={() => toggleProject(work.projectName)}
-                  title={isLoggedIn ? '单击空白处展开或收起，双击项目名称可重命名' : '单击展开或收起'}
+                  title={canEdit ? '单击空白处展开或收起，双击项目名称可重命名' : '单击展开或收起'}
                 >
                   <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke={acc} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M3.5 7.8h6l1.8 2h9.2v7.7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7.8Z" />
@@ -843,12 +859,12 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                         }
                       }}
                       maxLength={60}
-                      className="min-w-0 flex-1 rounded-md border border-blue-300 bg-white px-2.5 py-1 text-sm font-bold text-gray-900 outline-none ring-2 ring-blue-100"
+                      className="min-w-0 w-48 max-w-[50%] rounded-md border border-blue-300 bg-white px-2.5 py-1 text-sm font-bold text-gray-900 outline-none ring-2 ring-blue-100"
                       aria-label="项目名称"
                     />
                   ) : (
                     <h3
-                      className="min-w-0 flex-1 truncate text-sm font-bold tracking-wide text-gray-800"
+                      className="min-w-0 max-w-[60%] truncate text-sm font-bold tracking-wide text-gray-800"
                       onClick={(event) => event.stopPropagation()}
                       onDoubleClick={(event) => startProjectRename(event, work.projectName)}
                     >
@@ -873,7 +889,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                 <article
                   key={work.id}
                   data-work-card={work.id}
-                  className={`group relative select-none rounded-2xl transition-transform hover:-translate-y-1 ${filter === 'image' && imageAspectRatio(work, measuredImageRatios) && imageAspectRatio(work, measuredImageRatios) < 1 ? 'md:col-span-3' : 'md:col-span-4'} ${canArrange ? 'cursor-pointer' : 'cursor-pointer'} ${selectedMoveId === work.id ? 'ring-4 ring-orange-400' : selectedMoveId ? 'ring-2 ring-dashed ring-orange-200' : ''} ${work.hidden ? 'ring-2 ring-dashed ring-gray-300' : ''} ${selectedWorkSet.has(work.id) ? 'ring-4 ring-blue-400' : ''}`}
+                  className={`group relative select-none rounded-2xl transition-transform hover:-translate-y-1 ${filter === 'image' && imageAspectRatio(work, measuredImageRatios) && imageAspectRatio(work, measuredImageRatios) < 1 ? 'md:col-span-3' : 'md:col-span-4'} cursor-pointer ${selectedMoveId === work.id ? 'ring-4 ring-orange-400' : selectedMoveId ? 'ring-2 ring-dashed ring-orange-200' : ''} ${canEdit && work.hidden ? 'ring-2 ring-dashed ring-gray-300' : ''} ${canEdit && selectedWorkSet.has(work.id) ? 'ring-4 ring-blue-400' : ''}`}
                   onClick={() => handleWorkClick(work)}
                 >
                   <div
@@ -885,13 +901,13 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                     }}
                   >
                     {work.type === 'image' && work.file_path ? (
-                      <img src={assetUrl(work.file_path)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" />
+                      <img src={assetUrl(work.file_path)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${canEdit && work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" />
                     ) : work.thumbnail ? (
-                      <img src={assetUrl(work.thumbnail)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" />
+                      <img src={assetUrl(work.thumbnail)} alt={work.title} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${canEdit && work.hidden ? 'opacity-70 grayscale' : ''}`} loading="lazy" />
                     ) : externalVideoPreviewSrc(work) ? (
                       <video
                         src={externalVideoPreviewSrc(work)}
-                        className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${work.hidden ? 'opacity-70 grayscale' : ''}`}
+                        className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${canEdit && work.hidden ? 'opacity-70 grayscale' : ''}`}
                         muted
                         playsInline
                         preload="metadata"
@@ -917,7 +933,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                       />
                     )}
                     <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(9,12,24,0) 0%, rgba(6,8,18,0.04) 48%, rgba(6,8,18,0.24) 100%)' }} />
-                    {isLoggedIn && (
+                    {canEdit && (
                       <button
                         type="button"
                         onClick={(event) => handleToggleVisibility(event, work)}
@@ -928,7 +944,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                         {work.hidden ? '显示' : '隐藏'}
                       </button>
                     )}
-                    {isLoggedIn && !canArrange && (
+                    {canEdit && !canArrange && (
                       <button
                         type="button"
                         onClick={(event) => handleToggleFeatured(event, work)}
@@ -940,7 +956,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                         {featuredBusyId === work.id ? '保存中' : work.featured ? '★ 已精选' : '☆ 设为精选'}
                       </button>
                     )}
-                    {isLoggedIn && !canArrange && (
+                    {canEdit && !canArrange && (
                       <button
                         type="button"
                         onClick={(event) => toggleSelectedWork(event, work.id)}
@@ -962,7 +978,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                         {selectedMoveId === work.id ? '已选中' : '点击移动'}
                       </div>
                     )}
-                    {isLoggedIn && !canArrange && work.type === 'video' && (
+                    {canEdit && !canArrange && work.type === 'video' && (
                       <div className="absolute bottom-4 left-4 right-16 z-20 flex flex-wrap gap-1.5" onClick={(event) => event.stopPropagation()}>
                       <label
                         className={`inline-flex cursor-pointer items-center rounded-full px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur transition hover:scale-105 ${coverBusyId ? 'pointer-events-none opacity-50' : ''}`}
@@ -1005,7 +1021,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                     >
                       {work.title}
                     </h3>
-                    {isLoggedIn && !canArrange && work.type === 'video' && (
+                    {canEdit && !canArrange && work.type === 'video' && (
                       <div className="mt-2 flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
                         <select
                           value={work.category || ''}
@@ -1036,7 +1052,7 @@ export default function WorksGrid({ onSelectWork, hasOpenWork = false }) {
                       </div>
                     )}
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-400">
-                      {work.hidden && (
+                      {canEdit && work.hidden && (
                         <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600">
                           已隐藏：游客不可见
                         </span>
